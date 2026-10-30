@@ -1074,7 +1074,8 @@ var App = (function () {
   }
 
   /**
-   * Render the comprehensive report breakdown table
+   * Render the comprehensive report breakdown table.
+   * Columns are DYNAMIC — only status columns with at least 1 matching row are shown.
    */
   function renderReportBreakdown() {
     const thead = document.getElementById('reportTableHead');
@@ -1107,156 +1108,148 @@ var App = (function () {
       dimTitle.innerText = `Grouped Breakdown by: ${actualCol}`;
     }
 
-    // Table Columns:
-    // Dimension | Total Records | Approved | Review | Rejected | Ungate | Auto Ungate | Copy Listed | Pending | Success Rate
-    thead.innerHTML = `
-      <tr>
-        <th>${escapeHtml(actualCol)}</th>
-        <th style="text-align: right;">Total Records</th>
-        <th style="text-align: right; color: var(--status-approved-text);">Approved</th>
-        <th style="text-align: right; color: var(--status-ungate-text);">Ungate</th>
-        <th style="text-align: right; color: var(--status-auto-ungate-text);">Auto Ungate</th>
-        <th style="text-align: right; color: var(--status-review-text);">Review</th>
-        <th style="text-align: right; color: var(--status-rejected-text);">Rejected</th>
-        <th style="text-align: right; color: var(--status-copy-listed-text);">Copy Listed</th>
-        <th style="text-align: right; color: var(--status-pending-text);">Pending</th>
-        <th style="text-align: right;">Success Rate</th>
-      </tr>
-    `;
-
-    // Grouping
-    const groups = {};
     const rows = state.filteredRows;
+
+    // ── Step 1: Define ALL possible status columns with metadata ──────────────
+    const ALL_STATUS_COLS = [
+      { key: 'approved',        label: 'Approved',          cssVar: '--status-approved-text',    match: s => s === 'approved' },
+      { key: 'ungate',          label: 'Ungate',            cssVar: '--status-ungate-text',      match: s => s === 'ungate' || s === 'ungated' },
+      { key: 'autoUngate',      label: 'Auto Ungate',       cssVar: '--status-auto-ungate-text', match: s => s === 'auto ungate' },
+      { key: 'review',          label: 'Review',            cssVar: '--status-review-text',      match: s => s === 'review' },
+      { key: 'underReview',     label: 'Under Review',      cssVar: '--status-review-text',      match: s => s === 'under review' },
+      { key: 'gated',           label: 'Gated',             cssVar: '--status-gated-text',       match: s => s === 'gated' },
+      { key: 'rejected',        label: 'Rejected',          cssVar: '--status-rejected-text',    match: s => s === 'rejected' },
+      { key: 'copyListed',      label: 'Copy Listed',       cssVar: '--status-copy-listed-text', match: s => s === 'copy listed' },
+      { key: 'invSubmitted',    label: 'Invoice Submitted', cssVar: '--status-pending-text',     match: s => s === 'invoice submitted' },
+      { key: 'invPending',      label: 'Invoice Pending',   cssVar: '--status-pending-text',     match: s => s === 'invoice pending' },
+      { key: 'caseOpen',        label: 'Case Open',         cssVar: '--status-gated-text',       match: s => s === 'case open' },
+      { key: 'caseReopen1',     label: 'Re-open 1',         cssVar: '--status-review-text',      match: s => s === 'case re-open 1' },
+      { key: 'caseReopen2',     label: 'Re-open 2',         cssVar: '--status-review-text',      match: s => s === 'case re-open 2' },
+      { key: 'caseReopen3',     label: 'Re-open 3',         cssVar: '--status-review-text',      match: s => s === 'case re-open 3' },
+      { key: 'caseReopen4',     label: 'Re-open 4',         cssVar: '--status-review-text',      match: s => s === 'case re-open 4' },
+      { key: 'caseReopen5',     label: 'Re-open 5',         cssVar: '--status-review-text',      match: s => s === 'case re-open 5' },
+      { key: 'zeroReopen',      label: '0 Case Re-open',    cssVar: '--status-review-text',      match: s => s === '0 case re-open' },
+      { key: 'reApply',         label: 'Re-Apply',          cssVar: '--status-review-text',      match: s => s === 're-apply' },
+    ];
+
+    // ── Step 2: Group rows and accumulate counts ───────────────────────────────
+    const groups = {};
 
     rows.forEach(r => {
       let key = (r[actualCol] || 'Unassigned').toString().trim();
       if (!groups[key]) {
-        groups[key] = {
-          dimension: key,
-          total: 0,
-          approved: 0,
-          ungate: 0,
-          autoUngate: 0,
-          review: 0,
-          rejected: 0,
-          copyListed: 0,
-          pending: 0
-        };
+        const entry = { dimension: key, total: 0 };
+        ALL_STATUS_COLS.forEach(col => { entry[col.key] = 0; });
+        groups[key] = entry;
       }
 
       const g = groups[key];
       g.total++;
 
       const s = (r._canonicalStatus || '').toLowerCase();
-      if (s === 'approved') g.approved++;
-      else if (s === 'ungate') g.ungate++;
-      else if (s === 'auto ungate') g.autoUngate++;
-      else if (s === 'review') g.review++;
-      else if (s === 'rejected' || s === 'gated') g.rejected++;
-      else if (s === 'copy listed') g.copyListed++;
-      else if (s.includes('pending') || s.includes('invoice')) g.pending++;
+      ALL_STATUS_COLS.forEach(col => {
+        if (col.match(s)) g[col.key]++;
+      });
+    });
+
+    // ── Step 3: Determine which status columns actually have data ──────────────
+    const activeCols = ALL_STATUS_COLS.filter(col => {
+      return Object.values(groups).some(g => g[col.key] > 0);
     });
 
     const sortedGroups = Object.values(groups).sort((a, b) => b.total - a.total);
 
     if (sortedGroups.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">No records available.</td></tr>`;
+      const span = activeCols.length + 3; // dimension + total + active cols + success rate
+      tbody.innerHTML = `<tr><td colspan="${span}" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">No records available.</td></tr>`;
+      thead.innerHTML = '';
       return;
     }
 
+    // ── Step 4: Build header row with only active columns ─────────────────────
+    let theadHtml = `<tr>
+      <th>${escapeHtml(actualCol)}</th>
+      <th style="text-align: center;">Total</th>`;
+    activeCols.forEach(col => {
+      theadHtml += `<th style="text-align: center; color: var(${col.cssVar});">${col.label}</th>`;
+    });
+    theadHtml += `<th style="text-align: center;">Success Rate</th></tr>`;
+    thead.innerHTML = theadHtml;
+
+    // ── Step 5: Build body rows ────────────────────────────────────────────────
     let tbodyHtml = '';
-    let sumTotal = 0;
-    let sumApproved = 0;
-    let sumUngate = 0;
-    let sumAutoUngate = 0;
-    let sumReview = 0;
-    let sumRejected = 0;
-    let sumCopyListed = 0;
-    let sumPending = 0;
+    const sums = { total: 0 };
+    activeCols.forEach(col => { sums[col.key] = 0; });
+    let sumSuccess = 0;
 
     sortedGroups.forEach(g => {
-      sumTotal += g.total;
-      sumApproved += g.approved;
-      sumUngate += g.ungate;
-      sumAutoUngate += g.autoUngate;
-      sumReview += g.review;
-      sumRejected += g.rejected;
-      sumCopyListed += g.copyListed;
-      sumPending += g.pending;
+      sums.total += g.total;
+      const successKeys = ['approved', 'ungate', 'autoUngate'];
+      let rowSuccess = 0;
+      activeCols.forEach(col => {
+        sums[col.key] += g[col.key];
+        if (successKeys.includes(col.key)) rowSuccess += g[col.key];
+      });
+      // Also count success from keys not currently active but in group
+      successKeys.forEach(k => {
+        if (!activeCols.find(c => c.key === k)) rowSuccess += (g[k] || 0);
+      });
+      sumSuccess += rowSuccess;
 
-      const successful = g.approved + g.ungate + g.autoUngate;
-      const rate = g.total > 0 ? ((successful / g.total) * 100).toFixed(1) : '0';
+      const rate = g.total > 0 ? ((rowSuccess / g.total) * 100).toFixed(1) : '0';
+      const rateColor = parseFloat(rate) >= 50 ? 'var(--status-approved-text, #10b981)' : 'var(--status-review-text, #f59e0b)';
 
-      tbodyHtml += `
-        <tr>
-          <td style="font-weight: 600;">${escapeHtml(g.dimension)}</td>
-          <td style="text-align: right; font-weight: 700;">${formatNumber(g.total)}</td>
-          <td style="text-align: right; color: var(--status-approved-text);">${formatNumber(g.approved)}</td>
-          <td style="text-align: right; color: var(--status-ungate-text);">${formatNumber(g.ungate)}</td>
-          <td style="text-align: right; color: var(--status-auto-ungate-text);">${formatNumber(g.autoUngate)}</td>
-          <td style="text-align: right; color: var(--status-review-text);">${formatNumber(g.review)}</td>
-          <td style="text-align: right; color: var(--status-rejected-text);">${formatNumber(g.rejected)}</td>
-          <td style="text-align: right; color: var(--status-copy-listed-text);">${formatNumber(g.copyListed)}</td>
-          <td style="text-align: right; color: var(--status-pending-text);">${formatNumber(g.pending)}</td>
-          <td style="text-align: right;">
-            <span style="font-weight: 700; color: ${rate >= 50 ? 'var(--status-approved)' : 'var(--status-review)'};">
-              ${rate}%
-            </span>
-          </td>
-        </tr>
-      `;
+      tbodyHtml += `<tr>
+        <td style="font-weight: 600;">${escapeHtml(g.dimension)}</td>
+        <td style="text-align: center; font-weight: 700;">${formatNumber(g.total)}</td>`;
+      activeCols.forEach(col => {
+        const v = g[col.key];
+        tbodyHtml += `<td style="text-align: center; color: ${v > 0 ? `var(${col.cssVar})` : 'var(--text-dim)'};">${formatNumber(v)}</td>`;
+      });
+      tbodyHtml += `<td style="text-align: center;"><span style="font-weight: 700; color: ${rateColor};">${rate}%</span></td>
+      </tr>`;
     });
 
-    // Totals footer row
-    const totalSuccess = sumApproved + sumUngate + sumAutoUngate;
-    const overallRate = sumTotal > 0 ? ((totalSuccess / sumTotal) * 100).toFixed(1) : '0';
-
-    tbodyHtml += `
-      <tr style="background: var(--bg-tertiary); font-weight: 700; border-top: 2px solid var(--border-color);">
-        <td>TOTAL OVERVIEW</td>
-        <td style="text-align: right;">${formatNumber(sumTotal)}</td>
-        <td style="text-align: right;">${formatNumber(sumApproved)}</td>
-        <td style="text-align: right;">${formatNumber(sumUngate)}</td>
-        <td style="text-align: right;">${formatNumber(sumAutoUngate)}</td>
-        <td style="text-align: right;">${formatNumber(sumReview)}</td>
-        <td style="text-align: right;">${formatNumber(sumRejected)}</td>
-        <td style="text-align: right;">${formatNumber(sumCopyListed)}</td>
-        <td style="text-align: right;">${formatNumber(sumPending)}</td>
-        <td style="text-align: right; color: var(--primary);">${overallRate}%</td>
-      </tr>
-    `;
+    // ── Step 6: Totals footer ─────────────────────────────────────────────────
+    const overallRate = sums.total > 0 ? ((sumSuccess / sums.total) * 100).toFixed(1) : '0';
+    tbodyHtml += `<tr style="background: var(--bg-tertiary); font-weight: 700; border-top: 2px solid var(--border-color);">
+      <td>TOTAL OVERVIEW</td>
+      <td style="text-align: center;">${formatNumber(sums.total)}</td>`;
+    activeCols.forEach(col => {
+      tbodyHtml += `<td style="text-align: center;">${formatNumber(sums[col.key])}</td>`;
+    });
+    tbodyHtml += `<td style="text-align: center; color: var(--primary);">${overallRate}%</td></tr>`;
 
     tbody.innerHTML = tbodyHtml;
+
+    // Expose active columns for export
+    renderReportBreakdown._activeCols = activeCols;
+    renderReportBreakdown._actualCol = actualCol;
   }
 
   function exportCurrentReportMatrix() {
     if (!state.dataset) return;
 
-    // Grab current data from table
-    const targetDim = state.reportDimension || 'Group';
-    const rows = [];
-    const trs = document.querySelectorAll('#reportTableBody tr');
+    // Use the active columns recorded by the last renderReportBreakdown call
+    const activeCols = renderReportBreakdown._activeCols || [];
+    const actualCol  = renderReportBreakdown._actualCol || state.reportDimension || 'Group';
 
+    const colLabels = [actualCol, 'Total', ...activeCols.map(c => c.label), 'Success Rate'];
+    const rows = [];
+
+    const trs = document.querySelectorAll('#reportTableBody tr');
     trs.forEach(tr => {
       const tds = tr.querySelectorAll('td');
-      if (tds.length === 10) {
-        rows.push({
-          [targetDim]: tds[0].innerText,
-          'Total Records': tds[1].innerText,
-          'Approved': tds[2].innerText,
-          'Ungate': tds[3].innerText,
-          'Auto Ungate': tds[4].innerText,
-          'Review': tds[5].innerText,
-          'Rejected': tds[6].innerText,
-          'Copy Listed': tds[7].innerText,
-          'Pending': tds[8].innerText,
-          'Success Rate': tds[9].innerText
+      if (tds.length === colLabels.length) {
+        const obj = {};
+        colLabels.forEach((label, i) => {
+          obj[label] = tds[i].innerText.trim();
         });
+        rows.push(obj);
       }
     });
 
-    const cols = [targetDim, 'Total Records', 'Approved', 'Ungate', 'Auto Ungate', 'Review', 'Rejected', 'Copy Listed', 'Pending', 'Success Rate'];
-    DataExporter.exportReportMatrixToExcel(rows, cols, `Amazon_Ungating_${targetDim}_Breakdown.xlsx`);
+    DataExporter.exportReportMatrixToExcel(rows, colLabels, `Amazon_Ungating_${actualCol}_Breakdown.xlsx`);
   }
 
   /* ==========================================================================
