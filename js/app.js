@@ -17,7 +17,8 @@ var App = (function () {
     sortDirection: 'asc',
     currentView: 'dashboard',
     reportDimension: 'Company',
-    theme: localStorage.getItem('ungate_theme') || 'light'
+    theme: localStorage.getItem('ungate_theme') || 'light',
+    softwarePillActive: 'All'
   };
 
   /**
@@ -32,6 +33,7 @@ var App = (function () {
     initTableListeners();
     initExportListeners();
     initReportControls();
+    initSoftwareHubListeners();
 
     // Hook filter change
     FilterManager.onFilterChange(() => {
@@ -178,6 +180,7 @@ var App = (function () {
     // Update Header title
     const titles = {
       dashboard: 'Analytics Dashboard',
+      software: 'Software Hub & ASIN Tracker',
       reports: 'Detailed Reports & Matrix',
       table: 'Data Records Table',
       paste: 'Paste & Import Data'
@@ -191,11 +194,16 @@ var App = (function () {
     if (viewName === 'reports') {
       renderReportBreakdown();
     }
+    // If switching to software hub, render it
+    if (viewName === 'software') {
+      renderSoftwareHub();
+    }
   }
 
   function getViewIcon(view) {
     switch (view) {
       case 'dashboard': return 'chart-pie';
+      case 'software': return 'laptop-code';
       case 'reports': return 'chart-column';
       case 'table': return 'table-cells';
       case 'paste': return 'paste';
@@ -274,6 +282,35 @@ var App = (function () {
         closePasteModal();
       });
     }
+
+    // Dedicated Paste View Controls
+    const btnProcessViewPaste = document.getElementById('btnProcessViewPaste');
+    const viewPasteTextarea = document.getElementById('viewPasteTextarea');
+    if (btnProcessViewPaste && viewPasteTextarea) {
+      btnProcessViewPaste.addEventListener('click', () => {
+        const text = viewPasteTextarea.value;
+        if (!text.trim()) {
+          showToast('Please paste some Excel data first.', 'warning');
+          return;
+        }
+        processRawText(text, false);
+      });
+    }
+
+    const btnClearViewPaste = document.getElementById('btnClearViewPaste');
+    if (btnClearViewPaste && viewPasteTextarea) {
+      btnClearViewPaste.addEventListener('click', () => {
+        viewPasteTextarea.value = '';
+        viewPasteTextarea.focus();
+      });
+    }
+
+    const btnLoadSampleDedicated = document.getElementById('btnLoadSampleDedicated');
+    if (btnLoadSampleDedicated) {
+      btnLoadSampleDedicated.addEventListener('click', () => {
+        loadSampleData();
+      });
+    }
   }
 
   function openPasteModal() {
@@ -293,7 +330,7 @@ var App = (function () {
   }
 
   function initDragAndDrop() {
-    const dropZone = document.getElementById('pasteHeroBanner');
+    const dropZone = document.getElementById('viewPasteTextarea') || document.getElementById('view-paste');
     const fileInput = document.getElementById('fileUploadInput');
 
     if (dropZone) {
@@ -628,6 +665,17 @@ var App = (function () {
     const reportSelect = document.getElementById('reportDimensionSelect');
     if (reportSelect) reportSelect.innerHTML = `<option value="">-- Choose Any Detected Column --</option>`;
 
+    // Reset Software Hub
+    state.softwarePillActive = 'All';
+    const swPills = document.getElementById('softwarePillsBar');
+    if (swPills) swPills.innerHTML = '';
+    const swKpi = document.getElementById('softwareKpiGrid');
+    if (swKpi) swKpi.innerHTML = '<div class="kpi-empty">No data available. Load a dataset to see Software KPIs.</div>';
+    const swTbody = document.getElementById('softwareTableBody');
+    if (swTbody) swTbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:3rem;color:var(--text-muted);">Paste or load data to view Software ASIN records.</td></tr>';
+    const swBadge = document.getElementById('softwareTableCountBadge');
+    if (swBadge) swBadge.textContent = 'Showing 0 ASINs';
+
     if (!silent) {
       showToast('All data cleared. Paste your Excel data to begin.', 'info');
     }
@@ -664,6 +712,11 @@ var App = (function () {
 
     // Update Charts
     ChartManager.updateCharts(state.filteredRows, state.dataset.detectedColumns);
+
+    // If currently on software view, refresh it
+    if (state.currentView === 'software') {
+      renderSoftwareHub();
+    }
   }
 
   /* ==========================================================================
@@ -783,7 +836,16 @@ var App = (function () {
         } else if (/date/i.test(lowerH)) {
           tbodyHtml += `<td style="font-family: monospace;">${escapeHtml(val)}</td>`;
         } else if (/asin/i.test(lowerH)) {
-          tbodyHtml += `<td><span style="font-weight: 600; font-family: monospace; color: var(--primary);">${escapeHtml(val)}</span></td>`;
+          const sw = r._software || '';
+          const swCls = getSoftwareCssClass(sw);
+          tbodyHtml += `<td><span class="asin-cell-badge asin-software-${swCls}">${escapeHtml(val)}</span></td>`;
+        } else if (/software/i.test(lowerH) || h === (state.dataset && state.dataset.detectedColumns ? state.dataset.detectedColumns.softwareCol : '')) {
+          const swVal = val || r._software || '';
+          const swCls = getSoftwareCssClass(swVal);
+          const icon = swCls === 'unassigned' ? '' : `<i class="fa-solid fa-circle" style="font-size:6px;margin-right:4px;"></i>`;
+          tbodyHtml += `<td><span class="badge-software software-${swCls}">${icon}${escapeHtml(swVal || '—')}</span></td>`;
+        } else if (/more[\s/_-]*less|more|less/i.test(lowerH)) {
+          tbodyHtml += `<td style="font-weight: 500; color: var(--text-muted);">${escapeHtml(val || '—')}</td>`;
         } else if (/units|qty|quantity/i.test(lowerH)) {
           tbodyHtml += `<td style="font-weight: 600; text-align: right;">${escapeHtml(val)}</td>`;
         } else if (/case id|case number/i.test(lowerH)) {
@@ -960,6 +1022,7 @@ var App = (function () {
     else if (targetDim === 'Case Status' && detected.caseStatusCol) actualCol = detected.caseStatusCol;
     else if (targetDim === 'Date' && detected.dateCol) actualCol = detected.dateCol;
     else if (targetDim === 'ASIN' && detected.asinCol) actualCol = detected.asinCol;
+    else if (targetDim === 'Software' && detected.softwareCol) actualCol = detected.softwareCol;
 
     // Check if column exists
     if (!state.dataset.headers.includes(actualCol)) {
@@ -1164,6 +1227,84 @@ var App = (function () {
       });
     }
 
+    // Export JSON Backup
+    const btnExportJSON = document.getElementById('btnExportJSON');
+    if (btnExportJSON) {
+      btnExportJSON.addEventListener('click', () => {
+        if (!state.dataset || state.filteredRows.length === 0) {
+          showToast('No data available to export.', 'warning');
+          return;
+        }
+        DataExporter.exportToJSON(state.filteredRows, state.dataset.headers);
+        showToast('JSON dataset exported successfully!', 'success');
+      });
+    }
+
+    // Export Ungated Records Only
+    const btnExportUngated = document.getElementById('btnExportUngatedExcel');
+    if (btnExportUngated) {
+      btnExportUngated.addEventListener('click', () => {
+        if (!state.dataset || state.filteredRows.length === 0) {
+          showToast('No data available to export.', 'warning');
+          return;
+        }
+        DataExporter.exportUngatedOnly(state.filteredRows, state.dataset.headers);
+      });
+    }
+
+    // Export Gated Records Only
+    const btnExportGated = document.getElementById('btnExportGatedExcel');
+    if (btnExportGated) {
+      btnExportGated.addEventListener('click', () => {
+        if (!state.dataset || state.filteredRows.length === 0) {
+          showToast('No data available to export.', 'warning');
+          return;
+        }
+        DataExporter.exportGatedOnly(state.filteredRows, state.dataset.headers);
+      });
+    }
+
+    // Import JSON File
+    const btnImportJSON = document.getElementById('btnImportJSON');
+    const jsonFileInput = document.getElementById('jsonFileInput');
+    if (btnImportJSON && jsonFileInput) {
+      btnImportJSON.addEventListener('click', () => {
+        jsonFileInput.value = '';
+        jsonFileInput.click();
+      });
+
+      jsonFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const rawJson = evt.target.result;
+            const parsedArray = JSON.parse(rawJson);
+            let rows = Array.isArray(parsedArray) ? parsedArray : (parsedArray.rows || []);
+            if (!rows || rows.length === 0) {
+              showToast('No valid records found in JSON file.', 'warning');
+              return;
+            }
+
+            const headers = Object.keys(rows[0]).filter(k => !k.startsWith('_'));
+            const tsvLines = [headers.join('\t')];
+            rows.forEach(r => {
+              tsvLines.push(headers.map(h => r[h] !== undefined ? r[h] : '').join('\t'));
+            });
+            const tsvText = tsvLines.join('\r\n');
+            processRawText(tsvText, true);
+            showToast(`Loaded ${rows.length} records from JSON backup!`, 'success');
+          } catch (err) {
+            console.error(err);
+            showToast('Failed to parse JSON file. Ensure it is valid JSON.', 'error');
+          }
+        };
+        reader.readAsText(file);
+      });
+    }
+
     const btnExportClickUp = document.getElementById('btnExportClickUp');
     if (btnExportClickUp) {
       btnExportClickUp.addEventListener('click', () => {
@@ -1202,6 +1343,262 @@ var App = (function () {
         showToast('Unable to auto-copy. Please export via CSV/Excel.', 'error');
       }
       document.body.removeChild(ta);
+    }
+  }
+
+  /* ==========================================================================
+     Software CSS Helper
+     ========================================================================== */
+  /**
+   * Returns a CSS class suffix for a given software name.
+   * Used to apply color badges in the table and Software Hub.
+   */
+  function getSoftwareCssClass(name) {
+    const n = (name || '').toLowerCase().trim();
+    if (/orbit-?n/i.test(n)) return 'orbit-n';
+    if (/orbit-?b/i.test(n)) return 'orbit-b';
+    if (/orbit-?a/i.test(n)) return 'orbit-a';
+    if (/aura/i.test(n)) return 'aura';
+    if (/shipment/i.test(n)) return 'shipment';
+    if (n) return 'other';
+    return 'unassigned';
+  }
+
+  /* ==========================================================================
+     Software Hub — Render & Listeners
+     ========================================================================== */
+  /**
+   * Render the entire Software Hub view: pills, KPIs, charts, ASIN table.
+   */
+  function renderSoftwareHub() {
+    if (!state.dataset) return;
+
+    const rows = state.filteredRows;
+    const softwareCol = state.dataset.detectedColumns.softwareCol;
+    const asinCol = state.dataset.detectedColumns.asinCol;
+    const statusCol2 = state.dataset.detectedColumns.statusCol;
+
+    // --- Build software counts map ---
+    const swMap = {}; // { softwareName: { total, approved, rows[] } }
+    rows.forEach(r => {
+      const sw = r._software || (softwareCol ? (r[softwareCol] || '') : '') || '';
+      const label = sw.trim() || 'Unassigned';
+      if (!swMap[label]) swMap[label] = { total: 0, approved: 0, rows: [] };
+      swMap[label].total++;
+      swMap[label].rows.push(r);
+      const s = (r._canonicalStatus || '').toLowerCase();
+      if (s === 'approved' || s === 'ungate' || s === 'auto ungate') swMap[label].approved++;
+    });
+
+    const swNames = Object.keys(swMap).sort((a, b) => swMap[b].total - swMap[a].total);
+
+    // --- Pills Bar ---
+    const pillsBar = document.getElementById('softwarePillsBar');
+    if (pillsBar) {
+      const active = state.softwarePillActive || 'All';
+      let pillsHtml = `<button class="software-pill-btn ${active === 'All' ? 'active' : ''}" data-sw="All">
+        <i class="fa-solid fa-layer-group"></i> All <span class="pill-count">${rows.length}</span>
+      </button>`;
+      swNames.forEach(sw => {
+        const cls = getSoftwareCssClass(sw);
+        const isActive = active === sw;
+        pillsHtml += `<button class="software-pill-btn software-pill-${cls} ${isActive ? 'active' : ''}" data-sw="${escapeHtml(sw)}">
+          <i class="fa-solid fa-circle" style="font-size:7px;"></i> ${escapeHtml(sw)} <span class="pill-count">${swMap[sw].total}</span>
+        </button>`;
+      });
+      pillsBar.innerHTML = pillsHtml;
+
+      // Re-attach pill click events
+      pillsBar.querySelectorAll('.software-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.softwarePillActive = btn.getAttribute('data-sw');
+          renderSoftwareHub();
+        });
+      });
+    }
+
+    // --- Determine active rows for selected pill ---
+    const activePill = state.softwarePillActive || 'All';
+    let activeRows = rows;
+    if (activePill !== 'All') {
+      activeRows = (swMap[activePill] || { rows: [] }).rows;
+    }
+
+    // --- KPI Grid ---
+    const kpiGrid = document.getElementById('softwareKpiGrid');
+    if (kpiGrid) {
+      const displayNames = activePill === 'All' ? swNames : [activePill];
+      let kpiHtml = '';
+      displayNames.forEach(sw => {
+        const d = swMap[sw] || { total: 0, approved: 0 };
+        const rate = d.total > 0 ? ((d.approved / d.total) * 100).toFixed(1) : '0.0';
+        const cls = getSoftwareCssClass(sw);
+        kpiHtml += `
+          <div class="software-kpi-card software-kpi-${cls}">
+            <div class="kpi-sw-label"><span class="badge-software software-${cls}"><i class="fa-solid fa-circle" style="font-size:6px;margin-right:4px;"></i>${escapeHtml(sw)}</span></div>
+            <div class="kpi-sw-total">${formatNumber(d.total)}</div>
+            <div class="kpi-sw-sub">ASINs &bull; <strong>${rate}%</strong> Success</div>
+            <div class="kpi-sw-bar-wrap"><div class="kpi-sw-bar" style="width:${rate}%"></div></div>
+          </div>`;
+      });
+      if (!kpiHtml) kpiHtml = `<div class="kpi-empty">No data available. Load a dataset to see Software KPIs.</div>`;
+      kpiGrid.innerHTML = kpiHtml;
+    }
+
+    // --- Charts ---
+    if (typeof ChartManager !== 'undefined') {
+      ChartManager.renderSoftwareShareChart(rows, swMap);
+      ChartManager.renderSoftwarePerformanceChart(rows, swMap);
+    }
+
+    // --- ASIN Table ---
+    renderSoftwareTable(activeRows, state.dataset.detectedColumns);
+
+    // --- Count badge ---
+    const countBadge = document.getElementById('softwareTableCountBadge');
+    if (countBadge) countBadge.textContent = `${activeRows.length} ASINs`;
+  }
+
+  /**
+   * Render the filtered ASIN table inside Software Hub.
+   */
+  function renderSoftwareTable(rows, detectedColumns, searchTerm) {
+    const tbody = document.getElementById('softwareTableBody');
+    if (!tbody) return;
+
+    const d = detectedColumns || (state.dataset ? state.dataset.detectedColumns : {});
+    const search = (searchTerm || '').toLowerCase().trim();
+    let filtered = rows;
+    if (search) {
+      filtered = rows.filter(r => {
+        const asin = d.asinCol ? (r[d.asinCol] || '') : '';
+        const sw = r._software || (d.softwareCol ? (r[d.softwareCol] || '') : '') || '';
+        const comp = d.companyCol ? (r[d.companyCol] || '') : '';
+        const brand = d.brandCol ? (r[d.brandCol] || '') : '';
+        const status = r._canonicalStatus || '';
+        return asin.toLowerCase().includes(search) ||
+               sw.toLowerCase().includes(search) ||
+               comp.toLowerCase().includes(search) ||
+               brand.toLowerCase().includes(search) ||
+               status.toLowerCase().includes(search);
+      });
+    }
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:var(--text-dim);padding:2rem;">No ASINs found for current software filter.</td></tr>`;
+      return;
+    }
+
+    let html = '';
+    filtered.forEach((r, i) => {
+      const asin = d.asinCol ? (r[d.asinCol] || '—') : '—';
+      const sw = r._software || (d.softwareCol ? (r[d.softwareCol] || '') : '') || 'Unassigned';
+      const swCls = getSoftwareCssClass(sw);
+      const date = d.dateCol ? (r[d.dateCol] || '') : '';
+      const comp = d.companyCol ? (r[d.companyCol] || '—') : '—';
+      const brand = d.brandCol ? (r[d.brandCol] || '—') : '—';
+      const qty = d.unitsCol && r[d.unitsCol] !== undefined ? r[d.unitsCol] : '—';
+      const accStat = r._canonicalAccountStatus || (d.accountStatusCol ? (r[d.accountStatusCol] || '—') : '—');
+      const caseLog = r._canonicalCaseLog || (d.caseLogCol ? (r[d.caseLogCol] || '—') : '—');
+      const caseReopen = r._canonicalCaseStatus || (d.caseStatusCol ? (r[d.caseStatusCol] || '—') : '—');
+      const caseId = d.caseIdCol ? (r[d.caseIdCol] || '—') : '—';
+
+      html += `<tr>
+        <td style="color:var(--text-dim);font-size:0.75rem;">${i + 1}</td>
+        <td><span class="asin-cell-badge asin-software-${swCls}">${escapeHtml(asin)}</span></td>
+        <td><span class="badge-software software-${swCls}"><i class="fa-solid fa-circle" style="font-size:6px;margin-right:4px;"></i>${escapeHtml(sw)}</span></td>
+        <td style="font-family:monospace;font-size:0.8rem;color:var(--text-dim);">${escapeHtml(date)}</td>
+        <td title="${escapeHtml(comp)}">${escapeHtml(comp)}</td>
+        <td title="${escapeHtml(brand)}">${escapeHtml(brand)}</td>
+        <td style="font-weight:600;text-align:right;">${escapeHtml(qty)}</td>
+        <td><span class="badge-status ${getStatusBadgeClass(accStat)}"><i class="fa-solid fa-circle" style="font-size:6px;"></i> ${escapeHtml(accStat)}</span></td>
+        <td><span class="badge-status ${getStatusBadgeClass(caseLog)}"><i class="fa-solid fa-circle" style="font-size:6px;"></i> ${escapeHtml(caseLog)}</span></td>
+        <td><span class="badge-status ${getStatusBadgeClass(caseReopen)}"><i class="fa-solid fa-circle" style="font-size:6px;"></i> ${escapeHtml(caseReopen)}</span></td>
+        <td style="font-family:monospace;color:var(--text-dim);">${escapeHtml(caseId)}</td>
+      </tr>`;
+    });
+    tbody.innerHTML = html;
+  }
+
+  /**
+   * Initialize Software Hub event listeners (called once on init).
+   */
+  function initSoftwareHubListeners() {
+    // Search input for software ASIN table
+    const searchInput = document.getElementById('softwareTableSearch');
+    if (searchInput) {
+      let debounce;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(debounce);
+        debounce = setTimeout(() => {
+          if (!state.dataset) return;
+          const d = state.dataset.detectedColumns;
+          const rowsToFilter = state.softwarePillActive === 'All'
+            ? state.filteredRows
+            : state.filteredRows.filter(r => (r._software || (d.softwareCol ? (r[d.softwareCol] || '') : '') || '') === state.softwarePillActive || ((r._software || '') === '' && state.softwarePillActive === 'Unassigned'));
+          renderSoftwareTable(rowsToFilter, d, searchInput.value);
+        }, 250);
+      });
+    }
+
+    // Copy ASINs for current software selection
+    const btnCopy = document.getElementById('btnCopySoftwareAsins');
+    if (btnCopy) {
+      btnCopy.addEventListener('click', () => {
+        if (!state.dataset) { showToast('No data loaded.', 'warning'); return; }
+        const d = state.dataset.detectedColumns;
+        const active = state.softwarePillActive || 'All';
+        const rows = active === 'All' ? state.filteredRows : state.filteredRows.filter(r => {
+          const sw = r._software || (d.softwareCol ? (r[d.softwareCol] || '') : '') || 'Unassigned';
+          return sw === active;
+        });
+        const asins = rows.map(r => d.asinCol ? (r[d.asinCol] || '') : '').filter(Boolean);
+        if (!asins.length) { showToast('No ASINs to copy.', 'warning'); return; }
+        const text = asins.join('\n');
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); showToast(`${asins.length} ASINs copied!`, 'success'); }
+        catch (e) { showToast('Copy failed. Please copy manually.', 'error'); }
+        document.body.removeChild(ta);
+      });
+    }
+
+    // Export Excel for current software selection
+    const btnExport = document.getElementById('btnExportSoftwareExcel');
+    if (btnExport) {
+      btnExport.addEventListener('click', () => {
+        if (!state.dataset) { showToast('No data loaded.', 'warning'); return; }
+        const d = state.dataset.detectedColumns;
+        const active = state.softwarePillActive || 'All';
+        const rows = active === 'All' ? state.filteredRows : state.filteredRows.filter(r => {
+          const sw = r._software || (d.softwareCol ? (r[d.softwareCol] || '') : '') || 'Unassigned';
+          return sw === active;
+        });
+        if (!rows.length) { showToast('No data to export.', 'warning'); return; }
+        if (typeof DataExporter !== 'undefined') {
+          DataExporter.exportToExcel(rows, state.dataset.headers, `Software_${active.replace(/\s+/g, '_')}.xlsx`);
+        }
+      });
+    }
+
+    // Export PDF for current software selection
+    const btnExportPDF = document.getElementById('btnExportSoftwarePDF');
+    if (btnExportPDF) {
+      btnExportPDF.addEventListener('click', () => {
+        if (!state.dataset) { showToast('No data loaded.', 'warning'); return; }
+        const d = state.dataset.detectedColumns;
+        const active = state.softwarePillActive || 'All';
+        const rows = active === 'All' ? state.filteredRows : state.filteredRows.filter(r => {
+          const sw = r._software || (d.softwareCol ? (r[d.softwareCol] || '') : '') || 'Unassigned';
+          return sw === active;
+        });
+        if (!rows.length) { showToast('No data to export.', 'warning'); return; }
+        if (typeof DataExporter !== 'undefined') {
+          DataExporter.exportToPDF(rows, state.dataset.headers, `Amazon Ungating - Software Report (${active})`);
+        }
+      });
     }
   }
 

@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Amazon Ungating Analytics & Reporting Portal</title>
 
-    <!-- Google Fonts: Inter -->
+    <!-- Google Fonts: Poppins -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
 
@@ -63,6 +63,10 @@
           <a href="#dashboard" class="nav-item active" data-view="dashboard">
             <i class="fa-solid fa-chart-pie"></i>
             <span>Dashboard</span>
+          </a>
+          <a href="#software" class="nav-item" data-view="software">
+            <i class="fa-solid fa-laptop-code"></i>
+            <span>Other ASINs</span>
           </a>
           <a href="#reports" class="nav-item" data-view="reports">
             <i class="fa-solid fa-chart-column"></i>
@@ -143,14 +147,14 @@
             </div>
 
             <!-- Load Sample Data Button -->
-            <button
+            <!-- <button
               class="btn btn-secondary btn-sm"
               id="btnLoadSample"
               title="Load sample Amazon Ungating dataset"
             >
               <i class="fa-solid fa-flask"></i>
               <span>Sample Data</span>
-            </button>
+            </button> -->
 
             <!-- Clear All Data Button -->
             <button
@@ -201,12 +205,34 @@
                   <i class="fa-solid fa-file-pdf" style="color: #ef4444"></i>
                   Export to PDF
                 </button>
+                <button class="dropdown-item" id="btnExportJSON">
+                  <i class="fa-solid fa-file-code" style="color: #f59e0b"></i>
+                  Export JSON Backup (.json)
+                </button>
                 <div
                   style="
                     border-top: 1px solid var(--border-color);
                     margin: 4px 0;
                   "
                 ></div>
+                <button class="dropdown-item" id="btnExportUngatedExcel">
+                  <i class="fa-solid fa-circle-check" style="color: #059669"></i>
+                  Export Ungated Only (.xlsx)
+                </button>
+                <button class="dropdown-item" id="btnExportGatedExcel">
+                  <i class="fa-solid fa-circle-xmark" style="color: #dc2626"></i>
+                  Export Gated / Review (.xlsx)
+                </button>
+                <div
+                  style="
+                    border-top: 1px solid var(--border-color);
+                    margin: 4px 0;
+                  "
+                ></div>
+                <button class="dropdown-item" id="btnImportJSON">
+                  <i class="fa-solid fa-file-import" style="color: #8b5cf6"></i>
+                  Import JSON File
+                </button>
                 <button class="dropdown-item" id="btnExportClickUp">
                   <i
                     class="fa-solid fa-clipboard-check"
@@ -215,6 +241,7 @@
                   Copy ClickUp Report
                 </button>
               </div>
+              <input type="file" id="jsonFileInput" accept=".json,application/json" style="display: none;" />
             </div>
 
             <!-- Theme Toggle Button -->
@@ -230,36 +257,6 @@
 
         <!-- Content Views Body -->
         <div class="content-body">
-          <!-- Quick Paste Drop Area Banner -->
-          <div class="paste-hero-banner" id="pasteHeroBanner">
-            <div class="paste-hero-inner">
-              <div class="paste-icon-badge">
-                <i class="fa-solid fa-clipboard-check"></i>
-              </div>
-              <div class="paste-hero-title">
-                Paste Amazon Excel Data Instantly
-              </div>
-              <div class="paste-hero-desc">
-                Copy any ungating rows directly from Microsoft Excel or Google
-                Sheets, then click here or press <kbd>Ctrl + V</kbd>. Columns,
-                dates, and statuses are detected automatically!
-              </div>
-              <div class="paste-actions">
-                <button class="btn btn-primary btn-sm" id="btnHeroPaste">
-                  <i class="fa-solid fa-paste"></i> Open Paste Box
-                </button>
-                <button class="btn btn-secondary btn-sm" id="btnUploadFile">
-                  <i class="fa-solid fa-file-arrow-up"></i> Upload File (.xlsx,
-                  .csv)
-                </button>
-                <button class="btn btn-outline btn-sm" id="btnHeroSample">
-                  <i class="fa-solid fa-wand-magic-sparkles"></i> Try Sample
-                  Data
-                </button>
-              </div>
-            </div>
-          </div>
-
           <!-- Dynamic Universal Filters Section -->
           <div
             class="filter-card"
@@ -383,7 +380,152 @@
           </section>
 
           <!-- ================================================================
-             VIEW 2: DETAILED REPORTS MATRIX
+               VIEW 2: SOFTWARE HUB & ASIN CLASSIFICATION
+               ================================================================ -->
+          <section class="view-section" id="view-software">
+            <div class="software-hub-container">
+              <!-- Hero Card with Slicer Bar -->
+              <div class="software-hero-card">
+                <div class="software-hero-top">
+                  <div class="software-hero-title">
+                    <div class="software-hero-icon">
+                      <i class="fa-solid fa-laptop-code"></i>
+                    </div>
+                    <div>
+                      <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0">
+                        Software ASIN Tracker & Hub
+                      </h3>
+                      <p
+                        style="
+                          font-size: 0.8rem;
+                          color: var(--text-muted);
+                          margin: 0.2rem 0 0 0;
+                        "
+                      >
+                        Analyze, track & export ASINs classified by automation software (Orbit-N, Orbit-B, Orbit-A, Aura, Shipment)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                    <button
+                      class="btn btn-secondary btn-sm"
+                      id="btnCopySoftwareAsins"
+                      title="Copy visible ASINs of selected software to clipboard"
+                    >
+                      <i class="fa-solid fa-copy"></i>
+                      <span>Copy ASINs</span>
+                    </button>
+                    <button
+                      class="btn btn-primary btn-sm"
+                      id="btnExportSoftwareExcel"
+                      title="Download software report in Excel format"
+                      style="background: #10b981; border-color: #10b981;"
+                    >
+                      <i class="fa-solid fa-file-excel"></i>
+                      <span>Excel Report</span>
+                    </button>
+                    <button
+                      class="btn btn-primary btn-sm"
+                      id="btnExportSoftwarePDF"
+                      title="Download software report in PDF format"
+                      style="background: #ef4444; border-color: #ef4444;"
+                    >
+                      <i class="fa-solid fa-file-pdf"></i>
+                      <span>PDF Report</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Software Selection Slicer Pills -->
+                <div class="software-pills-bar" id="softwarePillsBar">
+                  <!-- Dynamically rendered by app.js -->
+                </div>
+              </div>
+
+              <!-- Software KPI Summary Cards -->
+              <div class="software-kpi-grid" id="softwareKpiGrid">
+                <!-- Dynamically populated cards for Orbit-N, Orbit-B, Orbit-A, Aura, Shipment, etc. -->
+              </div>
+
+              <!-- Visual Charts for Softwares -->
+              <div class="software-charts-grid">
+                <div class="chart-card">
+                  <div class="chart-header">
+                    <div class="chart-title">
+                      <i class="fa-solid fa-chart-pie" style="color: #6366f1"></i>
+                      <span>Software ASIN Volume Distribution</span>
+                    </div>
+                  </div>
+                  <div class="chart-container">
+                    <canvas id="chartSoftwareShare"></canvas>
+                  </div>
+                </div>
+
+                <div class="chart-card">
+                  <div class="chart-header">
+                    <div class="chart-title">
+                      <i class="fa-solid fa-chart-column" style="color: #10b981"></i>
+                      <span>Ungating Success Rate by Software</span>
+                    </div>
+                  </div>
+                  <div class="chart-container">
+                    <canvas id="chartSoftwarePerf"></canvas>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Software Filtered ASIN Master Table -->
+              <div class="table-card">
+                <div class="table-toolbar">
+                  <div class="table-search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input
+                      type="text"
+                      id="softwareTableSearch"
+                      placeholder="Search within software ASINs..."
+                    />
+                  </div>
+                  <div
+                    id="softwareTableCountBadge"
+                    style="
+                      font-size: 0.85rem;
+                      font-weight: 600;
+                      color: var(--text-muted);
+                    "
+                  >
+                    Showing 0 ASINs
+                  </div>
+                </div>
+
+                <div class="table-responsive-container">
+                  <table class="custom-data-table" id="softwareDataTable">
+                    <thead>
+                      <tr>
+                        <th style="width: 50px">#</th>
+                        <th>ASIN</th>
+                        <th>Software</th>
+                        <th>Date</th>
+                        <th>Company Name</th>
+                        <th>Brand</th>
+                        <th>Quantity</th>
+                        <th>Account Status</th>
+                        <th>Case Log</th>
+                        <th>Case Re-open</th>
+                        <th>Case ID</th>
+                      </tr>
+                    </thead>
+                    <tbody id="softwareTableBody">
+                      <!-- Dynamic rows -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================================================================
+             VIEW 3: DETAILED REPORTS MATRIX
              ================================================================ -->
           <section class="view-section" id="view-reports">
             <div class="report-matrix-card">
@@ -413,6 +555,9 @@
                     </button>
                     <button class="report-pill-btn" data-dim="Date">
                       Date
+                    </button>
+                    <button class="report-pill-btn" data-dim="Software">
+                      Software
                     </button>
                     <button class="report-pill-btn" data-dim="ASIN">
                       ASIN
@@ -555,20 +700,35 @@
                   gap: 0.75rem;
                   margin-top: 1rem;
                   justify-content: flex-end;
+                  flex-wrap: wrap;
                 "
               >
                 <button
-                  class="btn btn-secondary"
-                  onclick="
-                    document.getElementById('viewPasteTextarea').value = ''
-                  "
+                  class="btn btn-secondary btn-sm"
+                  id="btnClearViewPaste"
                 >
-                  Clear Box
+                  <i class="fa-solid fa-eraser me-1"></i> Clear Box
                 </button>
-                <button class="btn btn-primary" onclick="App.openPasteModal()">
-                  <i class="fa-solid fa-bolt"></i> Process Pasted Data
+                <button
+                  class="btn btn-outline btn-sm"
+                  id="btnUploadFile"
+                >
+                  <i class="fa-solid fa-file-arrow-up me-1"></i> Upload File (.xlsx, .csv)
+                </button>
+                <button
+                  class="btn btn-outline btn-sm"
+                  id="btnLoadSampleDedicated"
+                >
+                  <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Load Sample Data
+                </button>
+                <button
+                  class="btn btn-primary btn-sm"
+                  id="btnProcessViewPaste"
+                >
+                  <i class="fa-solid fa-bolt me-1"></i> Process Pasted Data
                 </button>
               </div>
+              <input type="file" id="fileUploadInput" accept=".xlsx,.xls,.csv" style="display: none;" />
             </div>
           </section>
         </div>

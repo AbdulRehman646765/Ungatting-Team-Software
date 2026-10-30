@@ -231,6 +231,20 @@ var DataExporter = (function () {
       report += `\n🏢 **Accounts Handled:**\n${compList}\n`;
     }
 
+    // Software Tools Breakdown
+    const swCounts = {};
+    rows.forEach(r => {
+      const sw = r._software || (detectedColumns && detectedColumns.softwareCol ? r[detectedColumns.softwareCol] : null);
+      if (sw && sw.trim()) {
+        const key = sw.trim();
+        swCounts[key] = (swCounts[key] || 0) + 1;
+      }
+    });
+    const swKeys = Object.keys(swCounts);
+    if (swKeys.length > 0) {
+      report += `\n💻 **Software Breakdown:**\n` + swKeys.map(k => `• **${k}:** ${swCounts[k]} ASINs`).join(' | ') + '\n';
+    }
+
     report += `\n🎯 **Action Items & Next Steps:**\n`;
     if (counts['Case Open'] || counts['Case Re-open 1']) {
       report += `1. Follow-up on active Seller Support cases for resolution.\n`;
@@ -248,11 +262,96 @@ var DataExporter = (function () {
     return report;
   }
 
+  /**
+   * Export array of objects to JSON file
+   */
+  function exportToJSON(data, headers, filename = 'Amazon_Ungating_Dataset.json') {
+    if (!data || data.length === 0) {
+      alert('No data available to export.');
+      return;
+    }
+
+    const cleanData = data.map(row => {
+      const cleanRow = {};
+      const cols = headers && headers.length ? headers : Object.keys(row).filter(k => !k.startsWith('_'));
+      cols.forEach(h => {
+        cleanRow[h] = row[h] !== undefined ? row[h] : '';
+      });
+      return cleanRow;
+    });
+
+    const jsonStr = JSON.stringify(cleanData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Export only Ungated / Approved ASIN records to Excel
+   */
+  function exportUngatedOnly(data, headers, filename = 'Amazon_Ungated_Records.xlsx') {
+    if (!data || data.length === 0) {
+      alert('No data available to export.');
+      return;
+    }
+
+    const ungatedRows = data.filter(r => {
+      const s = (r._canonicalStatus || '').toLowerCase();
+      const a = (r._canonicalAccountStatus || '').toLowerCase();
+      const l = (r._canonicalCaseLog || '').toLowerCase();
+      return s === 'ungate' || s === 'approved' || s === 'auto ungate' ||
+             a === 'ungate' || a === 'approved' || a === 'auto ungate' ||
+             l === 'ungate' || l === 'approved';
+    });
+
+    if (ungatedRows.length === 0) {
+      alert('No ungated records found in the current dataset.');
+      return;
+    }
+
+    exportToExcel(ungatedRows, headers, filename);
+  }
+
+  /**
+   * Export only Gated / Review / Rejected records to Excel
+   */
+  function exportGatedOnly(data, headers, filename = 'Amazon_Gated_Records.xlsx') {
+    if (!data || data.length === 0) {
+      alert('No data available to export.');
+      return;
+    }
+
+    const gatedRows = data.filter(r => {
+      const s = (r._canonicalStatus || '').toLowerCase();
+      const a = (r._canonicalAccountStatus || '').toLowerCase();
+      const l = (r._canonicalCaseLog || '').toLowerCase();
+      return !(s === 'ungate' || s === 'approved' || s === 'auto ungate' ||
+               a === 'ungate' || a === 'approved' || a === 'auto ungate' ||
+               l === 'ungate' || l === 'approved');
+    });
+
+    if (gatedRows.length === 0) {
+      alert('No gated / review records found in the current dataset.');
+      return;
+    }
+
+    exportToExcel(gatedRows, headers, filename);
+  }
+
   return {
     exportToExcel,
     exportReportMatrixToExcel,
     exportToCSV,
     exportToPDF,
+    exportToJSON,
+    exportUngatedOnly,
+    exportGatedOnly,
     generateClickUpReport
   };
 })();

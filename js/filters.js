@@ -14,6 +14,7 @@ var FilterManager = (function () {
     caseLog: '',
     caseStatus: '',
     qty: '',
+    software: '',
     status: '',
     company: '',
     category: '',
@@ -65,6 +66,7 @@ var FilterManager = (function () {
       caseLog: '',
       caseStatus: '',
       qty: '',
+      software: '',
       status: '',
       company: '',
       category: '',
@@ -194,6 +196,21 @@ var FilterManager = (function () {
       `;
     }
 
+    // 5. Software Filter (e.g. Orbit-N, Orbit-B, Orbit-A, Aura, Shipment)
+    const softCol = detected.softwareCol;
+    if (softCol && distinctValues[softCol] && distinctValues[softCol].size > 0) {
+      const softOptions = Array.from(distinctValues[softCol]).sort();
+      html += `
+        <div class="filter-group">
+          <label class="filter-label"><i class="fa-solid fa-laptop-code me-1"></i> ${escapeHtml(softCol || 'Software')}</label>
+          <select class="filter-select" id="filterSoftware" data-filter="software">
+            <option value="">All Softwares</option>
+            ${softOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.software === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+
     // Generic Status Filter (if none of the specific 3 status columns exist)
     if (!accCol && !caseLogCol && !caseStatusCol) {
       const allStatusesSet = new Set();
@@ -299,6 +316,7 @@ var FilterManager = (function () {
       caseLogCol,
       caseStatusCol,
       unitsCol,
+      softCol,
       compCol,
       catCol,
       supCol,
@@ -306,7 +324,8 @@ var FilterManager = (function () {
       dateCol,
       detected.asinCol,
       detected.skuCol,
-      detected.caseIdCol
+      detected.caseIdCol,
+      detected.moreLessCol
     ].filter(Boolean));
     
     headers.forEach(h => {
@@ -371,6 +390,9 @@ var FilterManager = (function () {
     }
     if (currentFilters.qty) {
       tags.push({ key: 'qty', label: `Qty: ${currentFilters.qty}` });
+    }
+    if (currentFilters.software) {
+      tags.push({ key: 'software', label: `Software: ${currentFilters.software}` });
     }
     if (currentFilters.status) {
       tags.push({ key: 'status', label: `Status: ${currentFilters.status}` });
@@ -447,18 +469,20 @@ var FilterManager = (function () {
     const caseLogVal = (currentFilters.caseLog || '').toLowerCase().trim();
     const caseStatusVal = (currentFilters.caseStatus || '').toLowerCase().trim();
     const qtyVal = (currentFilters.qty !== undefined && currentFilters.qty !== '') ? currentFilters.qty.toString().trim() : '';
+    const softVal = (currentFilters.software || '').toLowerCase().trim();
     const statusVal = currentFilters.status;
     const compVal = currentFilters.company;
     const catVal = currentFilters.category;
     const supVal = currentFilters.supplier;
     const brandVal = currentFilters.brand;
-    const dateFrom = currentFilters.dateFrom ? new Date(currentFilters.dateFrom) : null;
-    const dateTo = currentFilters.dateTo ? new Date(currentFilters.dateTo + 'T23:59:59') : null;
+    const dateFromStr = currentFilters.dateFrom ? currentFilters.dateFrom.trim() : "";
+    const dateToStr = currentFilters.dateTo ? currentFilters.dateTo.trim() : "";
 
     const accCol = d.accountStatusCol;
     const caseLogCol = d.caseLogCol;
     const caseStatusCol = d.caseStatusCol;
     const unitsCol = d.unitsCol;
+    const softCol = d.softwareCol;
     const statusCol = d.statusCol;
     const compCol = d.companyCol;
     const catCol = d.categoryCol;
@@ -492,6 +516,13 @@ var FilterManager = (function () {
       if (qtyVal) {
         const val = (unitsCol && r[unitsCol] !== undefined) ? r[unitsCol].toString().trim() : '';
         if (val !== qtyVal) return false;
+      }
+
+      // 4b. Software Filter
+      if (softVal) {
+        const val = (softCol && r[softCol] !== undefined) ? r[softCol].toString().toLowerCase().trim() : '';
+        const canon = (r._software || '').toLowerCase().trim();
+        if (val !== softVal && canon !== softVal) return false;
       }
 
       // 5. General Status Filter (fallback if used)
@@ -538,13 +569,13 @@ var FilterManager = (function () {
       }
 
       // 11. Date Range Filter
-      if ((dateFrom || dateTo) && dateCol) {
+      if ((dateFromStr || dateToStr) && dateCol) {
         const rowDateVal = r[dateCol];
         if (rowDateVal) {
-          const rowDate = new Date(rowDateVal);
-          if (!isNaN(rowDate)) {
-            if (dateFrom && rowDate < dateFrom) return false;
-            if (dateTo && rowDate > dateTo) return false;
+          const rowYmd = r._normalizedDate || (typeof DataParser !== 'undefined' ? DataParser.normalizeDateStr(rowDateVal) : rowDateVal);
+          if (rowYmd) {
+            if (dateFromStr && rowYmd < dateFromStr) return false;
+            if (dateToStr && rowYmd > dateToStr) return false;
           }
         }
       }

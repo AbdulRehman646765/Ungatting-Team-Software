@@ -305,20 +305,42 @@ var DataParser = (function () {
 
   /**
    * Normalize date string to standard YYYY-MM-DD format
-   * Supports DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, etc.
+   * Correctly handles DD-MM-YYYY, MM-DD-YYYY, and YYYY-MM-DD without month/day confusion
    */
   function normalizeDateStr(str) {
     if (!str || typeof str !== "string") return "";
     const s = str.trim();
-    // Match DD-MM-YYYY or DD/MM/YYYY
-    const dmy = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
-    if (dmy) {
-      return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
-    }
-    // Match YYYY-MM-DD or YYYY/MM/DD
+    if (!s) return "";
+
+    // 1. Match YYYY-MM-DD or YYYY/MM/DD
     const ymd = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
     if (ymd) {
       return `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`;
+    }
+
+    // 2. Match DD-MM-YYYY or MM-DD-YYYY
+    const dmy = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+    if (dmy) {
+      const p1 = parseInt(dmy[1], 10);
+      const p2 = parseInt(dmy[2], 10);
+      const year = dmy[3];
+
+      // If p1 > 12, p1 MUST be day: DD-MM-YYYY (e.g. 28-09-2026 -> 2026-09-28)
+      if (p1 > 12) {
+        return `${year}-${p2.toString().padStart(2, "0")}-${p1.toString().padStart(2, "0")}`;
+      }
+      // If p2 > 12, p2 MUST be day: MM-DD-YYYY (e.g. 10-26-2026 -> 2026-10-26)
+      if (p2 > 12) {
+        return `${year}-${p1.toString().padStart(2, "0")}-${p2.toString().padStart(2, "0")}`;
+      }
+      // Ambiguous (both <= 12, e.g. 10-01-2026): in Amazon sheets default to DD-MM-YYYY
+      return `${year}-${p2.toString().padStart(2, "0")}-${p1.toString().padStart(2, "0")}`;
+    }
+
+    // 3. Fallback: JS Date
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split("T")[0];
     }
     return s;
   }
@@ -364,6 +386,10 @@ var DataParser = (function () {
       "account",
       "case",
       "log",
+      "software",
+      "tool",
+      "more",
+      "less"
     ];
     const matches = firstRow.filter((cell) => {
       const l = (cell || "").toLowerCase().trim();
@@ -398,6 +424,66 @@ var DataParser = (function () {
         "Case ID",
         "Case re-open",
       ];
+    }
+
+    // Fast path: if exactly 12 columns and first column is an ASIN (B0...), use the exact Google Sheet headers with Software
+    if (numCols === 12 && /^B0/i.test((dataRows[0][0] || "").trim())) {
+      return [
+        "ASINS",
+        "Date",
+        "Company Name",
+        "Brand Name",
+        "Quantity",
+        "Account Status",
+        "Category",
+        "Popular Supplier Name",
+        "Case Log",
+        "Case ID",
+        "Case re-open",
+        "Software",
+      ];
+    }
+
+    // Fast path: if exactly 13 columns (exact user schema with More/Less and Software)
+    if (numCols === 13 && /^B0/i.test((dataRows[0][0] || "").trim())) {
+      return [
+        "ASINS",
+        "Date",
+        "Company Name",
+        "Brand Name",
+        "Quantity",
+        "Account Status",
+        "Category",
+        "Popular Supplier Name",
+        "Case Log",
+        "Case ID",
+        "Case re-open",
+        "More/Less",
+        "Software",
+      ];
+    }
+
+    // Fast path: if 14 or more columns (Google Sheets A through N where Col N is Software)
+    if (numCols >= 14 && /^B0/i.test((dataRows[0][0] || "").trim())) {
+      const h = [
+        "ASINS",
+        "Date",
+        "Company Name",
+        "Brand Name",
+        "Quantity",
+        "Account Status",
+        "Category",
+        "Popular Supplier Name",
+        "Case Log",
+        "Case ID",
+        "Case re-open",
+        "More/Less",
+      ];
+      for (let k = 12; k < numCols - 1; k++) {
+        h.push(`Column_${k + 1}`);
+      }
+      h.push("Software");
+      return h;
     }
 
     // 1. Detect ASINS (starts with B0...)
@@ -549,7 +635,38 @@ var DataParser = (function () {
       }
     }
 
-    // 10. Remaining unassigned columns: Assign Brand Name & Popular Supplier Name smartly
+    // 10. Detect Software (Orbit-B, Orbit-N, Orbit-A, Aura, Shipment, etc.)
+    for (let j = 0; j < numCols; j++) {
+      if (assigned[j]) continue;
+      let foundSoftware = false;
+      for (let i = 0; i < dataRows.length; i++) {
+        const v = (dataRows[i][j] || "").toLowerCase().trim();
+        if (/orbit|aura|shipment/i.test(v)) {
+          foundSoftware = true;
+          break;
+        }
+      }
+      if (foundSoftware) {
+        assigned[j] = "Software";
+        break;
+      }
+    }
+
+    // 10b. Detect More/Less
+    for (let j = 0; j < numCols; j++) {
+      if (assigned[j]) continue;
+      let m = 0;
+      for (let i = 0; i < sampleSize; i++) {
+        const v = (dataRows[i][j] || "").toLowerCase().trim();
+        if (v === "more" || v === "less" || /more|less/i.test(v)) m++;
+      }
+      if (m >= 1) {
+        assigned[j] = "More/Less";
+        break;
+      }
+    }
+
+    // 11. Remaining unassigned columns: Assign Brand Name & Popular Supplier Name smartly
     for (let j = 0; j < numCols; j++) {
       if (!assigned[j]) {
         if (
@@ -619,13 +736,63 @@ var DataParser = (function () {
       dataRows = parsedMatrix;
     }
 
+    // Prune trailing empty columns if all data rows in that column are blank
+    let maxValidCol = rawHeaders.length - 1;
+    while (maxValidCol > 10) {
+      const isHeaderEmpty = !rawHeaders[maxValidCol] || /^column_\d+$/i.test(rawHeaders[maxValidCol].trim());
+      const allCellsEmpty = dataRows.every(r => !r[maxValidCol] || r[maxValidCol].trim() === "");
+      if (isHeaderEmpty && allCellsEmpty) {
+        maxValidCol--;
+      } else {
+        break;
+      }
+    }
+    rawHeaders = rawHeaders.slice(0, maxValidCol + 1);
+
+    // Identify if any column contains Orbit/Aura/Shipment values and force it to be Software
+    for (let c = 0; c < rawHeaders.length; c++) {
+      const hLower = (rawHeaders[c] || "").toLowerCase().trim();
+      if (!hLower.includes("softw") && !hLower.includes("tool")) {
+        let hasSwValue = false;
+        for (let r = 0; r < dataRows.length; r++) {
+          const cell = (dataRows[r][c] || "").trim();
+          if (/^(orbit[\s_-]?[nba]|aura|shipment)$/i.test(cell)) {
+            hasSwValue = true;
+            break;
+          }
+        }
+        if (hasSwValue) {
+          rawHeaders[c] = "Software";
+        }
+      }
+    }
+
+    // Canonicalize header names to standard ungating schema
+    function canonicalizeHeader(name) {
+      const lower = (name || "").toLowerCase().trim();
+      if (/^asin[s]?$/i.test(lower)) return "ASINS";
+      if (/^date$/i.test(lower)) return "Date";
+      if (/^(company|company\s*name|account|store)$/i.test(lower)) return "Company Name";
+      if (/^(brand|brand\s*name)$/i.test(lower)) return "Brand Name";
+      if (/^(quantity|qty|units)$/i.test(lower)) return "Quantity";
+      if (/^(account\s*status|gate\s*status|gating\s*status)$/i.test(lower)) return "Account Status";
+      if (/^category(s)?$/i.test(lower)) return "Category";
+      if (/^(popular\s*supplier\s*name|supplier|supplier\s*name)$/i.test(lower)) return "Popular Supplier Name";
+      if (/^(case\s*log|log)$/i.test(lower)) return "Case Log";
+      if (/^(case\s*id|case\s*number)$/i.test(lower)) return "Case ID";
+      if (/^(case\s*re-?open|case\s*status)$/i.test(lower)) return "Case re-open";
+      if (/^(more[\s/_-]*less|more|less)$/i.test(lower)) return "More/Less";
+      if (/^(software|software[\s_-]?name|tool|tool[\s_-]?name|system)$/i.test(lower) || lower.includes("softw")) return "Software";
+      return name;
+    }
+
     // Sanitize and deduplicate headers
     const headers = [];
     const headerMap = {};
     const seenNames = {};
 
     rawHeaders.forEach((col, idx) => {
-      let clean = (col || "").toString().trim();
+      let clean = canonicalizeHeader((col || "").toString().trim());
       if (!clean) clean = `Column_${idx + 1}`;
 
       let uniqueName = clean;
@@ -769,6 +936,8 @@ var DataParser = (function () {
       skuCol: null,
       unitsCol: null,
       caseIdCol: null,
+      softwareCol: null,
+      moreLessCol: null,
     };
 
     // Candidate scores
@@ -776,6 +945,20 @@ var DataParser = (function () {
 
     headers.forEach((h) => {
       const lowerH = h.toLowerCase().trim();
+
+      // Check Software
+      if (!roles.softwareCol) {
+        if (/^(software|software[\s_-]?name|software[\s_-]?type|tool|tool[\s_-]?name|system)$/i.test(lowerH) || lowerH.includes("softw")) {
+          roles.softwareCol = h;
+        }
+      }
+
+      // Check More/Less
+      if (!roles.moreLessCol) {
+        if (/^(more[\s/_-]*less|more|less)$/i.test(lowerH)) {
+          roles.moreLessCol = h;
+        }
+      }
 
       // Check Account Status
       if (!roles.accountStatusCol) {
@@ -982,7 +1165,38 @@ var DataParser = (function () {
       roles.brandCol = headers.find((h) => /brand|prod/i.test(h)) || null;
     }
 
+    if (!roles.softwareCol) {
+      headers.forEach((h) => {
+        let hasMatch = false;
+        for (let i = 0; i < rows.length; i++) {
+          const val = (rows[i][h] || "").toLowerCase().trim();
+          if (/^(orbit[\s_-]?[nba]|aura|shipment)$/i.test(val) || /orbit|aura|shipment/i.test(val)) {
+            hasMatch = true;
+            break;
+          }
+        }
+        if (hasMatch) roles.softwareCol = h;
+      });
+      if (!roles.softwareCol) {
+        roles.softwareCol = headers.find((h) => /softw|tool/i.test(h)) || null;
+      }
+    }
+
     return roles;
+  }
+
+  /**
+   * Helper to normalize Software names
+   */
+  function normalizeSoftwareName(str) {
+    if (!str) return "";
+    const lower = str.toLowerCase().replace(/[\s_]+/g, "-").trim();
+    if (/orbit-?n/i.test(lower)) return "Orbit-N";
+    if (/orbit-?b/i.test(lower)) return "Orbit-B";
+    if (/orbit-?a/i.test(lower)) return "Orbit-A";
+    if (/aura/i.test(lower)) return "Aura";
+    if (/shipment/i.test(lower)) return "Shipment";
+    return str.trim();
   }
 
   /**
@@ -993,6 +1207,8 @@ var DataParser = (function () {
     const accStatusKey = detectedColumns.accountStatusCol;
     const caseLogKey = detectedColumns.caseLogCol;
     const caseStatusKey = detectedColumns.caseStatusCol;
+    const softwareKey = detectedColumns.softwareCol;
+    const dateKey = detectedColumns.dateCol;
 
     rows.forEach((r) => {
       let rawStatus = statusKey ? (r[statusKey] || "").toString().trim() : "";
@@ -1003,6 +1219,24 @@ var DataParser = (function () {
       let rawCase = caseStatusKey
         ? (r[caseStatusKey] || "").toString().trim()
         : "";
+      let rawSoftware = softwareKey
+        ? (r[softwareKey] || "").toString().trim()
+        : "";
+
+      // Fallback: If rawSoftware is blank, scan all non-internal columns of this row
+      if (!rawSoftware) {
+        for (const k of Object.keys(r)) {
+          if (k.startsWith('_')) continue;
+          const val = (r[k] || '').toString().trim();
+          if (/^(orbit[\s_-]?[nba]|aura|shipment)$/i.test(val)) {
+            rawSoftware = val;
+            if (!detectedColumns.softwareCol) {
+              detectedColumns.softwareCol = k;
+            }
+            break;
+          }
+        }
+      }
 
       // Canonical helper
       function canonicalize(str) {
@@ -1035,9 +1269,12 @@ var DataParser = (function () {
       const caseCan = canonicalize(rawCase);
       const statCan = canonicalize(rawStatus);
 
+      const rawDate = dateKey ? (r[dateKey] || "").toString().trim() : "";
+      r._normalizedDate = normalizeDateStr(rawDate);
       r._canonicalAccountStatus = accCan;
       r._canonicalCaseLog = logCan;
       r._canonicalCaseStatus = caseCan;
+      r._software = normalizeSoftwareName(rawSoftware);
       // Primary status: prefer Case Log outcome (Review, Rejected, Ungate), then status, then Account Status
       r._canonicalStatus = logCan || statCan || accCan || "Unknown";
     });
@@ -1138,6 +1375,18 @@ var DataParser = (function () {
       const caseId = `223${Math.floor(10000000 + Math.random() * 90000000)}`;
       const units = [50, 100, 200, 50, 100][i % 5];
 
+      // Software assignment (Orbit-N, Orbit-B, Orbit-A, Aura, Shipment, or Unassigned)
+      let softwareVal = "";
+      const softMod = i % 8;
+      if (softMod === 0 || softMod === 1) softwareVal = "Orbit-N";
+      else if (softMod === 2 || softMod === 3) softwareVal = "Orbit-B";
+      else if (softMod === 4) softwareVal = "Orbit-A";
+      else if (softMod === 5) softwareVal = "Aura";
+      else if (softMod === 6) softwareVal = "Shipment";
+      else softwareVal = "";
+
+      const moreLessVal = i % 3 === 0 ? "More" : (i % 3 === 1 ? "Less" : "");
+
       rows.push({
         ASINS: asin,
         Date: dateStr,
@@ -1150,6 +1399,8 @@ var DataParser = (function () {
         "Case Log": caseLog,
         "Case ID": caseId,
         "Case re-open": caseReopen,
+        "More/Less": moreLessVal,
+        Software: softwareVal,
       });
     }
 
@@ -1167,6 +1418,8 @@ var DataParser = (function () {
     parseText,
     inferColumnRoles,
     normalizeRowStatuses,
+    normalizeDateStr,
+    normalizeSoftwareName,
     generateSampleData,
     STATUS_CANONICAL_MAP,
   };

@@ -59,6 +59,8 @@ var ChartManager = (function () {
         charts[key] = null;
       }
     });
+    if (swCharts.share) { swCharts.share.destroy(); swCharts.share = null; }
+    if (swCharts.perf) { swCharts.perf.destroy(); swCharts.perf = null; }
   }
 
   /**
@@ -123,7 +125,7 @@ var ChartManager = (function () {
             position: 'right',
             labels: {
               color: theme.textColor,
-              font: { family: 'Inter', size: 11, weight: '500' },
+              font: { family: 'Poppins', size: 11, weight: '500' },
               boxWidth: 12,
               padding: 10
             }
@@ -221,19 +223,19 @@ var ChartManager = (function () {
         scales: {
           x: {
             stacked: true,
-            ticks: { color: theme.textMuted, font: { family: 'Inter', size: 11 } },
+            ticks: { color: theme.textMuted, font: { family: 'Poppins', size: 11 } },
             grid: { display: false }
           },
           y: {
             stacked: true,
-            ticks: { color: theme.textMuted, font: { family: 'Inter', size: 11 } },
+            ticks: { color: theme.textMuted, font: { family: 'Poppins', size: 11 } },
             grid: { color: theme.gridColor }
           }
         },
         plugins: {
           legend: {
             position: 'top',
-            labels: { color: theme.textColor, font: { family: 'Inter', size: 11 }, boxWidth: 12 }
+            labels: { color: theme.textColor, font: { family: 'Poppins', size: 11 }, boxWidth: 12 }
           }
         }
       }
@@ -282,11 +284,11 @@ var ChartManager = (function () {
         maintainAspectRatio: false,
         scales: {
           x: {
-            ticks: { color: theme.textMuted, font: { family: 'Inter', size: 11 } },
+            ticks: { color: theme.textMuted, font: { family: 'Poppins', size: 11 } },
             grid: { color: theme.gridColor }
           },
           y: {
-            ticks: { color: theme.textColor, font: { family: 'Inter', size: 11, weight: '500' } },
+            ticks: { color: theme.textColor, font: { family: 'Poppins', size: 11, weight: '500' } },
             grid: { display: false }
           }
         },
@@ -363,18 +365,18 @@ var ChartManager = (function () {
         maintainAspectRatio: false,
         scales: {
           x: {
-            ticks: { color: theme.textMuted, font: { family: 'Inter', size: 10 } },
+            ticks: { color: theme.textMuted, font: { family: 'Poppins', size: 10 } },
             grid: { display: false }
           },
           y: {
-            ticks: { color: theme.textMuted, font: { family: 'Inter', size: 11 } },
+            ticks: { color: theme.textMuted, font: { family: 'Poppins', size: 11 } },
             grid: { color: theme.gridColor }
           }
         },
         plugins: {
           legend: {
             position: 'top',
-            labels: { color: theme.textColor, font: { family: 'Inter', size: 11 }, boxWidth: 12 }
+            labels: { color: theme.textColor, font: { family: 'Poppins', size: 11 }, boxWidth: 12 }
           }
         }
       }
@@ -479,18 +481,18 @@ var ChartManager = (function () {
         maintainAspectRatio: false,
         scales: {
           x: {
-            ticks: { color: theme.textMuted, font: { family: 'Inter', size: 11 } },
+            ticks: { color: theme.textMuted, font: { family: 'Poppins', size: 11 } },
             grid: { display: false }
           },
           y: {
-            ticks: { color: theme.textMuted, font: { family: 'Inter', size: 11 } },
+            ticks: { color: theme.textMuted, font: { family: 'Poppins', size: 11 } },
             grid: { color: theme.gridColor }
           }
         },
         plugins: {
           legend: {
             position: 'top',
-            labels: { color: theme.textColor, font: { family: 'Inter', size: 11 }, boxWidth: 12 }
+            labels: { color: theme.textColor, font: { family: 'Poppins', size: 11 }, boxWidth: 12 }
           }
         }
       }
@@ -500,7 +502,7 @@ var ChartManager = (function () {
   function showEmptyChartMessage(canvas, msg) {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.font = '13px Inter, sans-serif';
+    ctx.font = '13px Poppins, sans-serif';
     ctx.fillStyle = '#94a3b8';
     ctx.textAlign = 'center';
     ctx.fillText(msg, canvas.width / 2, canvas.height / 2);
@@ -515,10 +517,198 @@ var ChartManager = (function () {
     return `hsl(${hue}, 65%, 55%)`;
   }
 
+  /* ==========================================================================
+     Software Hub Charts
+     ========================================================================== */
+
+  // Software type fixed color map (matches CSS badges)
+  const SOFTWARE_COLORS = {
+    'Orbit-N':   '#f59e0b',
+    'Orbit-B':   '#2563eb',
+    'Orbit-A':   '#7c3aed',
+    'Aura':      '#881337',
+    'Shipment':  '#059669',
+    'Unassigned':'#94a3b8'
+  };
+
+  function getSoftwareColor(name) {
+    if (!name || name === 'Unassigned') return SOFTWARE_COLORS['Unassigned'];
+    const n = name.trim();
+    if (SOFTWARE_COLORS[n]) return SOFTWARE_COLORS[n];
+    // Fuzzy match
+    const low = n.toLowerCase();
+    if (/orbit-?n/i.test(low)) return SOFTWARE_COLORS['Orbit-N'];
+    if (/orbit-?b/i.test(low)) return SOFTWARE_COLORS['Orbit-B'];
+    if (/orbit-?a/i.test(low)) return SOFTWARE_COLORS['Orbit-A'];
+    if (/aura/i.test(low)) return SOFTWARE_COLORS['Aura'];
+    if (/shipment/i.test(low)) return SOFTWARE_COLORS['Shipment'];
+    return generateColorForString(n);
+  }
+
+  // Store software chart instances separately so they don't get destroyed by destroyAll
+  let swCharts = { share: null, perf: null };
+
+  /**
+   * Doughnut chart — ASIN volume share per software.
+   * @param {Array} rows - All (filtered) rows.
+   * @param {Object} swMap - { softwareName: { total, approved, rows[] } }
+   */
+  function renderSoftwareShareChart(rows, swMap) {
+    const canvas = document.getElementById('chartSoftwareShare');
+    if (!canvas) return;
+
+    if (swCharts.share) { swCharts.share.destroy(); swCharts.share = null; }
+
+    const labels = Object.keys(swMap);
+    if (!labels.length) { showEmptyChartMessage(canvas, 'No software data to display'); return; }
+
+    const data = labels.map(l => swMap[l].total);
+    const bgColors = labels.map(l => getSoftwareColor(l));
+    const theme = getThemeColors();
+
+    swCharts.share = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: bgColors,
+          borderWidth: 2,
+          borderColor: theme.cardBg,
+          hoverOffset: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: {
+              color: theme.textColor,
+              font: { family: 'Poppins', size: 11, weight: '500' },
+              boxWidth: 12,
+              padding: 10
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                const pct = ((ctx.parsed / total) * 100).toFixed(1);
+                return ` ${ctx.label}: ${ctx.parsed} ASINs (${pct}%)`;
+              }
+            }
+          }
+        },
+        cutout: '60%'
+      }
+    });
+  }
+
+  /**
+   * Horizontal bar chart — Ungating success rate per software type.
+   * @param {Array} rows - All (filtered) rows.
+   * @param {Object} swMap - { softwareName: { total, approved, rows[] } }
+   */
+  function renderSoftwarePerformanceChart(rows, swMap) {
+    const canvas = document.getElementById('chartSoftwarePerf');
+    if (!canvas) return;
+
+    if (swCharts.perf) { swCharts.perf.destroy(); swCharts.perf = null; }
+
+    const labels = Object.keys(swMap).filter(l => swMap[l].total > 0);
+    if (!labels.length) { showEmptyChartMessage(canvas, 'No software data to display'); return; }
+
+    const successRates = labels.map(l => {
+      const d = swMap[l];
+      return d.total > 0 ? parseFloat(((d.approved / d.total) * 100).toFixed(1)) : 0;
+    });
+    const totalCounts = labels.map(l => swMap[l].total);
+    const bgColors = labels.map(l => getSoftwareColor(l));
+    const theme = getThemeColors();
+
+    swCharts.perf = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Success Rate (%)',
+            data: successRates,
+            backgroundColor: bgColors,
+            borderRadius: 6,
+            borderWidth: 0,
+            xAxisID: 'xRate'
+          },
+          {
+            label: 'Total ASINs',
+            data: totalCounts,
+            backgroundColor: bgColors.map(c => c + '44'),
+            borderColor: bgColors,
+            borderWidth: 1,
+            borderRadius: 4,
+            type: 'bar',
+            xAxisID: 'xCount'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        scales: {
+          y: {
+            ticks: { color: theme.textColor, font: { family: 'Poppins', size: 11, weight: '500' } },
+            grid: { display: false }
+          },
+          xRate: {
+            type: 'linear',
+            position: 'bottom',
+            min: 0,
+            max: 100,
+            ticks: {
+              color: theme.textMuted,
+              font: { family: 'Poppins', size: 10 },
+              callback: v => v + '%'
+            },
+            grid: { color: theme.gridColor }
+          },
+          xCount: {
+            type: 'linear',
+            position: 'top',
+            ticks: { color: theme.textMuted, font: { family: 'Poppins', size: 10 } },
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: theme.textColor,
+              font: { family: 'Poppins', size: 11 },
+              boxWidth: 12
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                if (ctx.datasetIndex === 0) return ` Success Rate: ${ctx.parsed.x}%`;
+                return ` Total ASINs: ${ctx.parsed.x}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
   return {
     updateCharts,
     destroyAll,
-    getThemeColors
+    getThemeColors,
+    renderSoftwareShareChart,
+    renderSoftwarePerformanceChart
   };
 })();
 
