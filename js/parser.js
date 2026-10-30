@@ -418,7 +418,11 @@ var DataParser = (function () {
       if (assigned[j]) continue;
       let m = 0;
       for (let i = 0; i < sampleSize; i++) {
-        if (/^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test((dataRows[i][j] || "").trim()))
+        if (
+          /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(
+            (dataRows[i][j] || "").trim(),
+          )
+        )
           m++;
       }
       if (m >= sampleSize * 0.4) {
@@ -532,7 +536,11 @@ var DataParser = (function () {
       let m = 0;
       for (let i = 0; i < sampleSize; i++) {
         const v = (dataRows[i][j] || "").trim();
-        if (/inc|llc|corp|ltd|store|hub|trades|goods|global|services|boutique/i.test(v))
+        if (
+          /inc|llc|corp|ltd|store|hub|trades|goods|global|services|boutique/i.test(
+            v,
+          )
+        )
           m++;
       }
       if (m >= sampleSize * 0.4) {
@@ -796,11 +804,7 @@ var DataParser = (function () {
 
       // Check General Status
       if (!roles.statusCol) {
-        if (
-          /^(status|approval status|ungate status)$/i.test(
-            lowerH,
-          )
-        ) {
+        if (/^(status|approval status|ungate status)$/i.test(lowerH)) {
           roles.statusCol = h;
         }
       }
@@ -840,7 +844,11 @@ var DataParser = (function () {
 
       // Check Brand / Manufacturer
       if (!roles.brandCol) {
-        if (/^(brand|brand name|manufacturer|make|product title|product)$/i.test(lowerH)) {
+        if (
+          /^(brand|brand name|manufacturer|make|product title|product)$/i.test(
+            lowerH,
+          )
+        ) {
           roles.brandCol = h;
         }
       }
@@ -904,7 +912,8 @@ var DataParser = (function () {
           const val = (rows[i][h] || "").trim();
           if (
             val &&
-            (/^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(val) || !isNaN(Date.parse(val)))
+            (/^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(val) ||
+              !isNaN(Date.parse(val)))
           ) {
             dateMatches++;
           }
@@ -950,18 +959,24 @@ var DataParser = (function () {
 
     // Default primary status column: prefer Case Log if available (Review, Rejected, Ungate), else Account Status or generic status
     if (!roles.statusCol) {
-      roles.statusCol = roles.caseLogCol || roles.accountStatusCol || headers.find(h => /status/i.test(h)) || null;
+      roles.statusCol =
+        roles.caseLogCol ||
+        roles.accountStatusCol ||
+        headers.find((h) => /status/i.test(h)) ||
+        null;
     }
 
     // Fallback: Company, Category, Supplier, Brand
     if (!roles.companyCol) {
-      roles.companyCol = headers.find((h) => /comp|acc|store|hub/i.test(h)) || null;
+      roles.companyCol =
+        headers.find((h) => /comp|acc|store|hub/i.test(h)) || null;
     }
     if (!roles.categoryCol) {
       roles.categoryCol = headers.find((h) => /cat|dept/i.test(h)) || null;
     }
     if (!roles.supplierCol) {
-      roles.supplierCol = headers.find((h) => /suppl|distrib|vend/i.test(h)) || null;
+      roles.supplierCol =
+        headers.find((h) => /suppl|distrib|vend/i.test(h)) || null;
     }
     if (!roles.brandCol) {
       roles.brandCol = headers.find((h) => /brand|prod/i.test(h)) || null;
@@ -981,9 +996,13 @@ var DataParser = (function () {
 
     rows.forEach((r) => {
       let rawStatus = statusKey ? (r[statusKey] || "").toString().trim() : "";
-      let rawAcc = accStatusKey ? (r[accStatusKey] || "").toString().trim() : "";
+      let rawAcc = accStatusKey
+        ? (r[accStatusKey] || "").toString().trim()
+        : "";
       let rawLog = caseLogKey ? (r[caseLogKey] || "").toString().trim() : "";
-      let rawCase = caseStatusKey ? (r[caseStatusKey] || "").toString().trim() : "";
+      let rawCase = caseStatusKey
+        ? (r[caseStatusKey] || "").toString().trim()
+        : "";
 
       // Canonical helper
       function canonicalize(str) {

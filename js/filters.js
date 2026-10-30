@@ -10,6 +10,10 @@ var FilterManager = (function () {
   // Active filter state
   let currentFilters = {
     search: '',
+    accountStatus: '',
+    caseLog: '',
+    caseStatus: '',
+    qty: '',
     status: '',
     company: '',
     category: '',
@@ -57,6 +61,10 @@ var FilterManager = (function () {
   function resetFilters() {
     currentFilters = {
       search: '',
+      accountStatus: '',
+      caseLog: '',
+      caseStatus: '',
+      qty: '',
       status: '',
       company: '',
       category: '',
@@ -91,6 +99,7 @@ var FilterManager = (function () {
 
     const rows = dataset.rows;
     const headers = dataset.headers;
+    const detected = detectedColumns || dataset.detectedColumns || {};
 
     // Collect distinct values for key dimensions
     const distinctValues = {};
@@ -100,7 +109,7 @@ var FilterManager = (function () {
 
     rows.forEach(r => {
       headers.forEach(h => {
-        const val = (r[h] || '').trim();
+        const val = (r[h] !== undefined && r[h] !== null) ? r[h].toString().trim() : '';
         if (val) distinctValues[h].add(val);
       });
     });
@@ -120,32 +129,100 @@ var FilterManager = (function () {
       <div class="filter-grid">
     `;
 
-    // 1. Status Filter - aggregate all status dimensions (Account Status, Case Log, Case Re-open)
-    const allStatusesSet = new Set();
-    rows.forEach(r => {
-      [r._canonicalStatus, r._canonicalAccountStatus, r._canonicalCaseLog, r._canonicalCaseStatus].forEach(s => {
-        if (s && s !== 'Unknown' && s !== 'None') allStatusesSet.add(s);
+    // 1. Account Status Filter (e.g. Gated, Ungate, Copylist)
+    const accCol = detected.accountStatusCol;
+    if (accCol && distinctValues[accCol] && distinctValues[accCol].size > 0) {
+      const accOptions = Array.from(distinctValues[accCol]).sort();
+      html += `
+        <div class="filter-group">
+          <label class="filter-label"><i class="fa-solid fa-shield-halved me-1"></i> ${escapeHtml(accCol)}</label>
+          <select class="filter-select" id="filterAccountStatus" data-filter="accountStatus">
+            <option value="">All Account Statuses</option>
+            ${accOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.accountStatus === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+
+    // 2. Case Log Filter (e.g. Review, Rejected, Ungate, Approved)
+    const caseLogCol = detected.caseLogCol;
+    if (caseLogCol && distinctValues[caseLogCol] && distinctValues[caseLogCol].size > 0) {
+      const logOptions = Array.from(distinctValues[caseLogCol]).sort();
+      html += `
+        <div class="filter-group">
+          <label class="filter-label"><i class="fa-solid fa-clipboard-list me-1"></i> ${escapeHtml(caseLogCol)}</label>
+          <select class="filter-select" id="filterCaseLog" data-filter="caseLog">
+            <option value="">All Case Logs</option>
+            ${logOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.caseLog === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+
+    // 3. Case Re-open Filter (e.g. Case Open, Case re-open 1..5, Re-apply, Under review)
+    const caseStatusCol = detected.caseStatusCol;
+    if (caseStatusCol && distinctValues[caseStatusCol] && distinctValues[caseStatusCol].size > 0) {
+      const reopenOptions = Array.from(distinctValues[caseStatusCol]).sort();
+      html += `
+        <div class="filter-group">
+          <label class="filter-label"><i class="fa-solid fa-rotate me-1"></i> ${escapeHtml(caseStatusCol)}</label>
+          <select class="filter-select" id="filterCaseStatus" data-filter="caseStatus">
+            <option value="">All Case Re-open Statuses</option>
+            ${reopenOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.caseStatus === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+
+    // 4. Quantity / Qty Filter (numerical values sorted ascending)
+    const unitsCol = detected.unitsCol;
+    if (unitsCol && distinctValues[unitsCol] && distinctValues[unitsCol].size > 0) {
+      const qtyOptions = Array.from(distinctValues[unitsCol]).sort((a, b) => {
+        const numA = parseFloat(a);
+        const numB = parseFloat(b);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.localeCompare(b, undefined, { numeric: true });
       });
-    });
-    const statusOptions = Array.from(allStatusesSet).sort();
+      html += `
+        <div class="filter-group">
+          <label class="filter-label"><i class="fa-solid fa-boxes-stacked me-1"></i> ${escapeHtml(unitsCol || 'Quantity')}</label>
+          <select class="filter-select" id="filterQty" data-filter="qty">
+            <option value="">All Quantities</option>
+            ${qtyOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.qty === opt ? 'selected' : ''}>${escapeHtml(opt)} Units</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
 
-    html += `
-      <div class="filter-group">
-        <label class="filter-label">Status</label>
-        <select class="filter-select" id="filterStatus" data-filter="status">
-          <option value="">All Statuses (${rows.length})</option>
-          ${statusOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.status === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
-        </select>
-      </div>
-    `;
+    // Generic Status Filter (if none of the specific 3 status columns exist)
+    if (!accCol && !caseLogCol && !caseStatusCol) {
+      const allStatusesSet = new Set();
+      rows.forEach(r => {
+        [r._canonicalStatus, r._canonicalAccountStatus, r._canonicalCaseLog, r._canonicalCaseStatus].forEach(s => {
+          if (s && s !== 'Unknown' && s !== 'None') allStatusesSet.add(s);
+        });
+      });
+      if (allStatusesSet.size > 0) {
+        const statusOptions = Array.from(allStatusesSet).sort();
+        html += `
+          <div class="filter-group">
+            <label class="filter-label"><i class="fa-solid fa-tag me-1"></i> Status</label>
+            <select class="filter-select" id="filterStatus" data-filter="status">
+              <option value="">All Statuses (${rows.length})</option>
+              ${statusOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.status === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
+            </select>
+          </div>
+        `;
+      }
+    }
 
-    // 2. Company Filter
-    const compCol = detectedColumns.companyCol;
+    // 5. Company Filter
+    const compCol = detected.companyCol;
     if (compCol && distinctValues[compCol]) {
       const compOptions = Array.from(distinctValues[compCol]).sort();
       html += `
         <div class="filter-group">
-          <label class="filter-label">${escapeHtml(compCol)}</label>
+          <label class="filter-label"><i class="fa-solid fa-building me-1"></i> ${escapeHtml(compCol)}</label>
           <select class="filter-select" id="filterCompany" data-filter="company">
             <option value="">All Companies</option>
             ${compOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.company === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
@@ -154,13 +231,13 @@ var FilterManager = (function () {
       `;
     }
 
-    // 3. Category Filter
-    const catCol = detectedColumns.categoryCol;
+    // 6. Category Filter
+    const catCol = detected.categoryCol;
     if (catCol && distinctValues[catCol]) {
       const catOptions = Array.from(distinctValues[catCol]).sort();
       html += `
         <div class="filter-group">
-          <label class="filter-label">${escapeHtml(catCol)}</label>
+          <label class="filter-label"><i class="fa-solid fa-shapes me-1"></i> ${escapeHtml(catCol)}</label>
           <select class="filter-select" id="filterCategory" data-filter="category">
             <option value="">All Categories</option>
             ${catOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.category === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
@@ -169,13 +246,13 @@ var FilterManager = (function () {
       `;
     }
 
-    // 4. Supplier Filter
-    const supCol = detectedColumns.supplierCol;
+    // 7. Supplier Filter
+    const supCol = detected.supplierCol;
     if (supCol && distinctValues[supCol]) {
       const supOptions = Array.from(distinctValues[supCol]).sort();
       html += `
         <div class="filter-group">
-          <label class="filter-label">${escapeHtml(supCol)}</label>
+          <label class="filter-label"><i class="fa-solid fa-truck-ramp-box me-1"></i> ${escapeHtml(supCol)}</label>
           <select class="filter-select" id="filterSupplier" data-filter="supplier">
             <option value="">All Suppliers</option>
             ${supOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.supplier === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
@@ -184,13 +261,13 @@ var FilterManager = (function () {
       `;
     }
 
-    // 5. Brand Filter
-    const brandCol = detectedColumns.brandCol;
+    // 8. Brand Filter
+    const brandCol = detected.brandCol;
     if (brandCol && distinctValues[brandCol]) {
       const brandOptions = Array.from(distinctValues[brandCol]).sort();
       html += `
         <div class="filter-group">
-          <label class="filter-label">${escapeHtml(brandCol)}</label>
+          <label class="filter-label"><i class="fa-solid fa-award me-1"></i> ${escapeHtml(brandCol)}</label>
           <select class="filter-select" id="filterBrand" data-filter="brand">
             <option value="">All Brands</option>
             ${brandOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.brand === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
@@ -199,23 +276,38 @@ var FilterManager = (function () {
       `;
     }
 
-    // 6. Date Range Filters (if date column exists)
-    const dateCol = detectedColumns.dateCol;
+    // 9. Date Range Filters (if date column exists)
+    const dateCol = detected.dateCol;
     if (dateCol) {
       html += `
         <div class="filter-group">
-          <label class="filter-label">From Date</label>
+          <label class="filter-label"><i class="fa-solid fa-calendar me-1"></i> From Date</label>
           <input type="date" class="filter-input" id="filterDateFrom" data-filter="dateFrom" value="${currentFilters.dateFrom || ''}">
         </div>
         <div class="filter-group">
-          <label class="filter-label">To Date</label>
+          <label class="filter-label"><i class="fa-solid fa-calendar-check me-1"></i> To Date</label>
           <input type="date" class="filter-input" id="filterDateTo" data-filter="dateTo" value="${currentFilters.dateTo || ''}">
         </div>
       `;
     }
 
-    // 7. Dynamic Filters for any other detected columns with manageable cardinality (e.g. 2 to 40 unique values)
-    const standardCols = new Set([statusCol, compCol, catCol, supCol, brandCol, dateCol, detectedColumns.asinCol, detectedColumns.skuCol]);
+    // 10. Dynamic Filters for any other detected columns with manageable cardinality (e.g. 2 to 45 unique values)
+    const statusCol = detected.statusCol;
+    const standardCols = new Set([
+      statusCol,
+      accCol,
+      caseLogCol,
+      caseStatusCol,
+      unitsCol,
+      compCol,
+      catCol,
+      supCol,
+      brandCol,
+      dateCol,
+      detected.asinCol,
+      detected.skuCol,
+      detected.caseIdCol
+    ].filter(Boolean));
     
     headers.forEach(h => {
       if (!standardCols.has(h) && distinctValues[h] && distinctValues[h].size >= 2 && distinctValues[h].size <= 45) {
@@ -268,6 +360,18 @@ var FilterManager = (function () {
     if (currentFilters.search) {
       tags.push({ key: 'search', label: `Search: "${currentFilters.search}"` });
     }
+    if (currentFilters.accountStatus) {
+      tags.push({ key: 'accountStatus', label: `Account: ${currentFilters.accountStatus}` });
+    }
+    if (currentFilters.caseLog) {
+      tags.push({ key: 'caseLog', label: `Log: ${currentFilters.caseLog}` });
+    }
+    if (currentFilters.caseStatus) {
+      tags.push({ key: 'caseStatus', label: `Case: ${currentFilters.caseStatus}` });
+    }
+    if (currentFilters.qty) {
+      tags.push({ key: 'qty', label: `Qty: ${currentFilters.qty}` });
+    }
     if (currentFilters.status) {
       tags.push({ key: 'status', label: `Status: ${currentFilters.status}` });
     }
@@ -318,8 +422,10 @@ var FilterManager = (function () {
         const key = icon.getAttribute('data-remove-key');
         setFilter(key, '');
         // also sync select element if exists
-        const selectElem = document.querySelector(`[data-filter="${CSS.escape(key)}"]`);
-        if (selectElem) selectElem.value = '';
+        try {
+          const selectElem = document.querySelector(`[data-filter="${key}"]`);
+          if (selectElem) selectElem.value = '';
+        } catch (e) {}
       });
     });
 
@@ -335,7 +441,12 @@ var FilterManager = (function () {
   function filterRows(rows, detectedColumns) {
     if (!rows || rows.length === 0) return [];
 
+    const d = detectedColumns || {};
     const searchLower = (currentFilters.search || '').toLowerCase().trim();
+    const accStatusVal = (currentFilters.accountStatus || '').toLowerCase().trim();
+    const caseLogVal = (currentFilters.caseLog || '').toLowerCase().trim();
+    const caseStatusVal = (currentFilters.caseStatus || '').toLowerCase().trim();
+    const qtyVal = (currentFilters.qty !== undefined && currentFilters.qty !== '') ? currentFilters.qty.toString().trim() : '';
     const statusVal = currentFilters.status;
     const compVal = currentFilters.company;
     const catVal = currentFilters.category;
@@ -344,15 +455,46 @@ var FilterManager = (function () {
     const dateFrom = currentFilters.dateFrom ? new Date(currentFilters.dateFrom) : null;
     const dateTo = currentFilters.dateTo ? new Date(currentFilters.dateTo + 'T23:59:59') : null;
 
-    const statusCol = detectedColumns.statusCol;
-    const compCol = detectedColumns.companyCol;
-    const catCol = detectedColumns.categoryCol;
-    const supCol = detectedColumns.supplierCol;
-    const brandCol = detectedColumns.brandCol;
-    const dateCol = detectedColumns.dateCol;
+    const accCol = d.accountStatusCol;
+    const caseLogCol = d.caseLogCol;
+    const caseStatusCol = d.caseStatusCol;
+    const unitsCol = d.unitsCol;
+    const statusCol = d.statusCol;
+    const compCol = d.companyCol;
+    const catCol = d.categoryCol;
+    const supCol = d.supplierCol;
+    const brandCol = d.brandCol;
+    const dateCol = d.dateCol;
 
     return rows.filter(r => {
-      // 1. Status Filter - checks across all status dimensions (Account Status, Case Log, Case Re-open, etc.)
+      // 1. Account Status Filter
+      if (accStatusVal) {
+        const val = (accCol && r[accCol] !== undefined) ? r[accCol].toString().toLowerCase().trim() : '';
+        const canon = (r._canonicalAccountStatus || '').toLowerCase().trim();
+        if (val !== accStatusVal && canon !== accStatusVal) return false;
+      }
+
+      // 2. Case Log Filter
+      if (caseLogVal) {
+        const val = (caseLogCol && r[caseLogCol] !== undefined) ? r[caseLogCol].toString().toLowerCase().trim() : '';
+        const canon = (r._canonicalCaseLog || '').toLowerCase().trim();
+        if (val !== caseLogVal && canon !== caseLogVal) return false;
+      }
+
+      // 3. Case Re-open Filter
+      if (caseStatusVal) {
+        const val = (caseStatusCol && r[caseStatusCol] !== undefined) ? r[caseStatusCol].toString().toLowerCase().trim() : '';
+        const canon = (r._canonicalCaseStatus || '').toLowerCase().trim();
+        if (val !== caseStatusVal && canon !== caseStatusVal) return false;
+      }
+
+      // 4. Quantity (Qty) Filter
+      if (qtyVal) {
+        const val = (unitsCol && r[unitsCol] !== undefined) ? r[unitsCol].toString().trim() : '';
+        if (val !== qtyVal) return false;
+      }
+
+      // 5. General Status Filter (fallback if used)
       if (statusVal) {
         const rowStatuses = [
           r._canonicalStatus,
@@ -360,9 +502,9 @@ var FilterManager = (function () {
           r._canonicalCaseLog,
           r._canonicalCaseStatus,
           statusCol ? r[statusCol] : null,
-          detectedColumns.accountStatusCol ? r[detectedColumns.accountStatusCol] : null,
-          detectedColumns.caseLogCol ? r[detectedColumns.caseLogCol] : null,
-          detectedColumns.caseStatusCol ? r[detectedColumns.caseStatusCol] : null
+          accCol ? r[accCol] : null,
+          caseLogCol ? r[caseLogCol] : null,
+          caseStatusCol ? r[caseStatusCol] : null
         ].filter(Boolean).map(s => s.toString().toLowerCase().trim());
 
         if (!rowStatuses.includes(statusVal.toLowerCase().trim())) {
@@ -370,32 +512,32 @@ var FilterManager = (function () {
         }
       }
 
-      // 2. Company Filter
+      // 6. Company Filter
       if (compVal && compCol) {
         if ((r[compCol] || '').trim() !== compVal) return false;
       }
 
-      // 3. Category Filter
+      // 7. Category Filter
       if (catVal && catCol) {
         if ((r[catCol] || '').trim() !== catVal) return false;
       }
 
-      // 4. Supplier Filter
+      // 8. Supplier Filter
       if (supVal && supCol) {
         if ((r[supCol] || '').trim() !== supVal) return false;
       }
 
-      // 5. Brand Filter
+      // 9. Brand Filter
       if (brandVal && brandCol) {
         if ((r[brandCol] || '').trim() !== brandVal) return false;
       }
 
-      // 6. Dynamic Filters
+      // 10. Dynamic Filters
       for (const [colName, requiredVal] of Object.entries(currentFilters.dynamic)) {
         if ((r[colName] || '').trim() !== requiredVal) return false;
       }
 
-      // 7. Date Range Filter
+      // 11. Date Range Filter
       if ((dateFrom || dateTo) && dateCol) {
         const rowDateVal = r[dateCol];
         if (rowDateVal) {
@@ -407,7 +549,7 @@ var FilterManager = (function () {
         }
       }
 
-      // 8. Global Search Query across all fields
+      // 12. Global Search Query across all fields
       if (searchLower) {
         const match = Object.values(r).some(val => 
           val && val.toString().toLowerCase().includes(searchLower)

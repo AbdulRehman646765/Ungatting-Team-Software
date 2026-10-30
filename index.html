@@ -1,466 +1,703 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" data-theme="light">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Amazon Ungating Analytics & Reporting Portal</title>
-  
-  <!-- Google Fonts: Inter -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  
-  <!-- Font Awesome 6 Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  
-  <!-- Custom Styles -->
-  <link rel="stylesheet" href="css/style.css">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Amazon Ungating Analytics & Reporting Portal</title>
 
-  <!-- SheetJS (Excel xlsx parser & exporter) -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
 
-  <!-- Chart.js 4 -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Font Awesome 6 Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+      integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
 
-  <!-- jsPDF & autoTable for PDF export -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-</head>
-<body>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="css/style.css" />
 
-  <div class="app-container">
-    <!-- Sidebar Navigation -->
-    <aside class="sidebar" id="appSidebar">
-      <div class="sidebar-header">
-        <a href="#" class="brand">
-          <div class="brand-icon">
-            <i class="fa-brands fa-amazon"></i>
-          </div>
-          <div class="brand-text">
-            <span class="brand-title">Ungate Pro</span>
-            <span class="brand-subtitle">Amazon Analytics</span>
-          </div>
-        </a>
-        <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Sidebar">
-          <i class="fa-solid fa-bars-staggered"></i>
-        </button>
-      </div>
+    <!-- SheetJS (Excel xlsx parser & exporter) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-      <nav class="sidebar-nav">
-        <div class="nav-section-title">Main Menu</div>
-        <a href="#dashboard" class="nav-item active" data-view="dashboard">
-          <i class="fa-solid fa-chart-pie"></i>
-          <span>Dashboard</span>
-        </a>
-        <a href="#reports" class="nav-item" data-view="reports">
-          <i class="fa-solid fa-chart-column"></i>
-          <span>Detailed Reports</span>
-        </a>
-        <a href="#table" class="nav-item" data-view="table">
-          <i class="fa-solid fa-table-cells"></i>
-          <span>Data Records</span>
-        </a>
+    <!-- Chart.js 4 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-        <div class="nav-section-title">Data Ingestion</div>
-        <a href="#paste" class="nav-item" data-view="paste">
-          <i class="fa-solid fa-paste"></i>
-          <span>Paste / Upload</span>
-        </a>
-      </nav>
-
-      <div class="sidebar-footer">
-        <div class="quick-data-card">
-          <div class="quick-data-title">
-            <i class="fa-solid fa-bolt text-primary"></i>
-            <span>Active Dataset</span>
-          </div>
-          <div class="quick-data-stats" id="quickTotalStats">0</div>
-          <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 0.2rem;">
-            Press <kbd style="font-family: inherit; font-size: 0.7rem; padding: 1px 4px; border: 1px solid var(--border-color); border-radius: 3px;">Ctrl + V</kbd> anywhere
-          </div>
-        </div>
-      </div>
-    </aside>
-
-    <!-- Main Content Wrapper -->
-    <main class="main-wrapper">
-      <!-- Top Navigation Header -->
-      <header class="top-header">
-        <div class="header-left">
-          <button class="mobile-menu-btn" id="mobileMenuBtn">
-            <i class="fa-solid fa-bars"></i>
+    <!-- jsPDF & autoTable for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Sidebar Navigation -->
+      <aside class="sidebar" id="appSidebar">
+        <div class="sidebar-header">
+          <a href="#" class="brand">
+            <div class="brand-icon">
+              <i class="fa-brands fa-amazon"></i>
+            </div>
+            <div class="brand-text">
+              <span class="brand-title">Ungate Pro</span>
+              <span class="brand-subtitle">Amazon Analytics</span>
+            </div>
+          </a>
+          <button
+            class="sidebar-toggle-btn"
+            id="sidebarToggleBtn"
+            title="Toggle Sidebar"
+          >
+            <i class="fa-solid fa-bars-staggered"></i>
           </button>
-          <div class="page-info-title" id="pageTitle">
-            <i class="fa-solid fa-chart-pie me-2"></i> Analytics Dashboard
-          </div>
-          <span class="dataset-badge" id="datasetBadge">
-            <i class="fa-solid fa-check-circle"></i> Ready to Analyze
-          </span>
         </div>
 
-        <div class="header-actions">
-          <!-- Global Search -->
-          <div class="table-search-box" style="width: 220px; display: none;" id="headerSearchWrapper">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" id="globalSearchInput" placeholder="Quick search...">
-          </div>
+        <nav class="sidebar-nav">
+          <div class="nav-section-title">Main Menu</div>
+          <a href="#dashboard" class="nav-item active" data-view="dashboard">
+            <i class="fa-solid fa-chart-pie"></i>
+            <span>Dashboard</span>
+          </a>
+          <a href="#reports" class="nav-item" data-view="reports">
+            <i class="fa-solid fa-chart-column"></i>
+            <span>Detailed Reports</span>
+          </a>
+          <a href="#table" class="nav-item" data-view="table">
+            <i class="fa-solid fa-table-cells"></i>
+            <span>Data Records</span>
+          </a>
 
-          <!-- Load Sample Data Button -->
-          <button class="btn btn-secondary btn-sm" id="btnLoadSample" title="Load sample Amazon Ungating dataset">
-            <i class="fa-solid fa-flask"></i>
-            <span>Sample Data</span>
-          </button>
-
-          <!-- Clear All Data Button -->
-          <button class="btn btn-sm" id="btnClearData" title="Clear all data and start fresh"
-            style="background: transparent; border: 1px solid var(--status-rejected); color: var(--status-rejected); display: none;">
-            <i class="fa-solid fa-trash-can"></i>
-            <span>Clear Data</span>
-          </button>
-
-          <!-- Paste Data Trigger -->
-          <button class="btn btn-primary btn-sm" id="btnOpenPasteModal" title="Paste Excel or CSV data">
+          <div class="nav-section-title">Data Ingestion</div>
+          <a href="#paste" class="nav-item" data-view="paste">
             <i class="fa-solid fa-paste"></i>
-            <span>Paste Data</span>
-          </button>
+            <span>Paste / Upload</span>
+          </a>
+        </nav>
 
-          <!-- Export Dropdown -->
-          <div class="dropdown-wrapper">
-            <button class="btn btn-secondary btn-sm" id="exportDropdownBtn">
-              <i class="fa-solid fa-file-export"></i>
-              <span>Export</span>
-              <i class="fa-solid fa-chevron-down ms-1" style="font-size: 0.7rem;"></i>
+        <div class="sidebar-footer">
+          <div class="quick-data-card">
+            <div class="quick-data-title">
+              <i class="fa-solid fa-bolt text-primary"></i>
+              <span>Active Dataset</span>
+            </div>
+            <div class="quick-data-stats" id="quickTotalStats">0</div>
+            <div
+              style="
+                font-size: 0.72rem;
+                color: var(--text-dim);
+                margin-top: 0.2rem;
+              "
+            >
+              Press
+              <kbd
+                style="
+                  font-family: inherit;
+                  font-size: 0.7rem;
+                  padding: 1px 4px;
+                  border: 1px solid var(--border-color);
+                  border-radius: 3px;
+                "
+                >Ctrl + V</kbd
+              >
+              anywhere
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content Wrapper -->
+      <main class="main-wrapper">
+        <!-- Top Navigation Header -->
+        <header class="top-header">
+          <div class="header-left">
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+              <i class="fa-solid fa-bars"></i>
             </button>
-            <div class="dropdown-menu" id="exportDropdownMenu">
-              <button class="dropdown-item" id="btnExportExcel">
-                <i class="fa-solid fa-file-excel" style="color: #10b981;"></i> Export to Excel (.xlsx)
-              </button>
-              <button class="dropdown-item" id="btnExportCSV">
-                <i class="fa-solid fa-file-csv" style="color: #0ea5e9;"></i> Export to CSV
-              </button>
-              <button class="dropdown-item" id="btnExportPDF">
-                <i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i> Export to PDF
-              </button>
+            <div class="page-info-title" id="pageTitle">
+              <i class="fa-solid fa-chart-pie me-2"></i> Analytics Dashboard
             </div>
+            <span class="dataset-badge" id="datasetBadge">
+              <i class="fa-solid fa-check-circle"></i> Ready to Analyze
+            </span>
           </div>
 
-          <!-- Theme Toggle Button -->
-          <button class="btn btn-icon" id="themeToggleBtn" title="Toggle Dark/Light Mode">
-            <i class="fa-solid fa-moon"></i>
-          </button>
-        </div>
-      </header>
+          <div class="header-actions">
+            <!-- Global Search -->
+            <div
+              class="table-search-box"
+              style="width: 220px; display: none"
+              id="headerSearchWrapper"
+            >
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input
+                type="text"
+                id="globalSearchInput"
+                placeholder="Quick search..."
+              />
+            </div>
 
-      <!-- Content Views Body -->
-      <div class="content-body">
-        
-        <!-- Quick Paste Drop Area Banner -->
-        <div class="paste-hero-banner" id="pasteHeroBanner">
-          <div class="paste-hero-inner">
-            <div class="paste-icon-badge">
-              <i class="fa-solid fa-clipboard-check"></i>
-            </div>
-            <div class="paste-hero-title">Paste Amazon Excel Data Instantly</div>
-            <div class="paste-hero-desc">
-              Copy any ungating rows directly from Microsoft Excel or Google Sheets, then click here or press <kbd>Ctrl + V</kbd>.
-              Columns, dates, and statuses are detected automatically!
-            </div>
-            <div class="paste-actions">
-              <button class="btn btn-primary btn-sm" id="btnHeroPaste">
-                <i class="fa-solid fa-paste"></i> Open Paste Box
+            <!-- Load Sample Data Button -->
+            <button
+              class="btn btn-secondary btn-sm"
+              id="btnLoadSample"
+              title="Load sample Amazon Ungating dataset"
+            >
+              <i class="fa-solid fa-flask"></i>
+              <span>Sample Data</span>
+            </button>
+
+            <!-- Clear All Data Button -->
+            <button
+              class="btn btn-sm"
+              id="btnClearData"
+              title="Clear all data and start fresh"
+              style="
+                background: transparent;
+                border: 1px solid var(--status-rejected);
+                color: var(--status-rejected);
+                display: none;
+              "
+            >
+              <i class="fa-solid fa-trash-can"></i>
+              <span>Clear Data</span>
+            </button>
+
+            <!-- Paste Data Trigger -->
+            <button
+              class="btn btn-primary btn-sm"
+              id="btnOpenPasteModal"
+              title="Paste Excel or CSV data"
+            >
+              <i class="fa-solid fa-paste"></i>
+              <span>Paste Data</span>
+            </button>
+
+            <!-- Export Dropdown -->
+            <div class="dropdown-wrapper">
+              <button class="btn btn-secondary btn-sm" id="exportDropdownBtn">
+                <i class="fa-solid fa-file-export"></i>
+                <span>Export</span>
+                <i
+                  class="fa-solid fa-chevron-down ms-1"
+                  style="font-size: 0.7rem"
+                ></i>
               </button>
-              <button class="btn btn-secondary btn-sm" id="btnUploadFile">
-                <i class="fa-solid fa-file-arrow-up"></i> Upload File (.xlsx, .csv)
-              </button>
-              <button class="btn btn-outline btn-sm" id="btnHeroSample">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> Try Sample Data
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Dynamic Universal Filters Section -->
-        <div class="filter-card" id="filterCardContainer" style="display: none;">
-          <!-- Populated dynamically by filters.js -->
-        </div>
-
-        <!-- ================================================================
-             VIEW 1: DASHBOARD
-             ================================================================ -->
-        <section class="view-section active" id="view-dashboard">
-          <!-- Statistics Cards Grid Header -->
-          <div class="stats-header-bar">
-            <div class="section-heading">
-              <i class="fa-solid fa-gauge-high text-primary"></i>
-              <span>Dashboard Status Statistics</span>
-            </div>
-          </div>
-
-          <!-- Core & Detected Metrics Grid -->
-          <div class="stats-grid" id="dashboardMetricsGrid">
-            <!-- Dynamically populated by dashboard.js -->
-          </div>
-
-          <!-- Dynamic Status Chips Ribbon -->
-          <div class="dynamic-status-ribbon" id="statusRibbonContainer">
-            <!-- Dynamically populated by dashboard.js -->
-          </div>
-
-          <!-- Charts Visualization Section -->
-          <div id="chartsVisualizationWrapper" style="display: none;">
-            <div class="section-heading" style="margin-bottom: 1rem;">
-              <i class="fa-solid fa-chart-line text-primary"></i>
-              <span>Visual Analytics & Distribution</span>
-            </div>
-
-            <div class="charts-grid">
-              <!-- Chart 1: Status Distribution -->
-              <div class="chart-card">
-                <div class="chart-header">
-                  <div class="chart-title">
-                    <i class="fa-solid fa-chart-pie" style="color: #4f46e5;"></i>
-                    <span>Status Distribution</span>
-                  </div>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartStatus"></canvas>
-                </div>
-              </div>
-
-              <!-- Chart 2: Company Comparison -->
-              <div class="chart-card">
-                <div class="chart-header">
-                  <div class="chart-title">
-                    <i class="fa-solid fa-building" style="color: #10b981;"></i>
-                    <span>Company Comparison</span>
-                  </div>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartCompany"></canvas>
-                </div>
-              </div>
-
-              <!-- Chart 3: Category Breakdown -->
-              <div class="chart-card">
-                <div class="chart-header">
-                  <div class="chart-title">
-                    <i class="fa-solid fa-layer-group" style="color: #06b6d4;"></i>
-                    <span>Category Breakdown</span>
-                  </div>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartCategory"></canvas>
-                </div>
-              </div>
-
-              <!-- Chart 4: Supplier Performance -->
-              <div class="chart-card">
-                <div class="chart-header">
-                  <div class="chart-title">
-                    <i class="fa-solid fa-truck-ramp-box" style="color: #f59e0b;"></i>
-                    <span>Supplier Performance</span>
-                  </div>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartSupplier"></canvas>
-                </div>
-              </div>
-
-              <!-- Chart 5: Daily / Monthly Trends (Full Width) -->
-              <div class="chart-card full-width">
-                <div class="chart-header">
-                  <div class="chart-title">
-                    <i class="fa-solid fa-chart-area" style="color: #8b5cf6;"></i>
-                    <span>Submission Trends Over Time</span>
-                  </div>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartTrend"></canvas>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ================================================================
-             VIEW 2: DETAILED REPORTS MATRIX
-             ================================================================ -->
-        <section class="view-section" id="view-reports">
-          <div class="report-matrix-card">
-            <div class="report-controls-bar">
-              <div class="report-group-selector">
-                <label><i class="fa-solid fa-filter me-1"></i> Analyze By:</label>
-                <div class="report-pills-nav">
-                  <button class="report-pill-btn active" data-dim="Company">Company</button>
-                  <button class="report-pill-btn" data-dim="Category">Category</button>
-                  <button class="report-pill-btn" data-dim="Supplier">Supplier</button>
-                  <button class="report-pill-btn" data-dim="Brand">Brand</button>
-                  <button class="report-pill-btn" data-dim="Status">Status</button>
-                  <button class="report-pill-btn" data-dim="Case Status">Case Status</button>
-                  <button class="report-pill-btn" data-dim="Date">Date</button>
-                  <button class="report-pill-btn" data-dim="ASIN">ASIN</button>
-                </div>
-              </div>
-
-              <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <select class="filter-select" id="reportDimensionSelect" style="width: auto; min-width: 180px;">
-                  <!-- Dynamic options for other columns -->
-                </select>
-                <button class="btn btn-sm btn-success" id="btnExportReportExcel">
-                  <i class="fa-solid fa-file-excel"></i> Export Report
+              <div class="dropdown-menu" id="exportDropdownMenu">
+                <button class="dropdown-item" id="btnExportExcel">
+                  <i class="fa-solid fa-file-excel" style="color: #10b981"></i>
+                  Export to Excel (.xlsx)
+                </button>
+                <button class="dropdown-item" id="btnExportCSV">
+                  <i class="fa-solid fa-file-csv" style="color: #0ea5e9"></i>
+                  Export to CSV
+                </button>
+                <button class="dropdown-item" id="btnExportPDF">
+                  <i class="fa-solid fa-file-pdf" style="color: #ef4444"></i>
+                  Export to PDF
+                </button>
+                <div
+                  style="
+                    border-top: 1px solid var(--border-color);
+                    margin: 4px 0;
+                  "
+                ></div>
+                <button class="dropdown-item" id="btnExportClickUp">
+                  <i
+                    class="fa-solid fa-clipboard-check"
+                    style="color: #7b68ee"
+                  ></i>
+                  Copy ClickUp Report
                 </button>
               </div>
             </div>
 
-            <div class="p-3" style="padding: 1rem 1.25rem 0.5rem; font-weight: 700; color: var(--text-main);" id="reportCurrentDimensionLabel">
-              Grouped Breakdown
-            </div>
+            <!-- Theme Toggle Button -->
+            <button
+              class="btn btn-icon"
+              id="themeToggleBtn"
+              title="Toggle Dark/Light Mode"
+            >
+              <i class="fa-solid fa-moon"></i>
+            </button>
+          </div>
+        </header>
 
-            <div class="table-responsive-container">
-              <table class="custom-data-table" id="reportDataTable">
-                <thead id="reportTableHead">
-                  <!-- Generated dynamically by app.js -->
-                </thead>
-                <tbody id="reportTableBody">
-                  <!-- Generated dynamically by app.js -->
-                </tbody>
-              </table>
+        <!-- Content Views Body -->
+        <div class="content-body">
+          <!-- Quick Paste Drop Area Banner -->
+          <div class="paste-hero-banner" id="pasteHeroBanner">
+            <div class="paste-hero-inner">
+              <div class="paste-icon-badge">
+                <i class="fa-solid fa-clipboard-check"></i>
+              </div>
+              <div class="paste-hero-title">
+                Paste Amazon Excel Data Instantly
+              </div>
+              <div class="paste-hero-desc">
+                Copy any ungating rows directly from Microsoft Excel or Google
+                Sheets, then click here or press <kbd>Ctrl + V</kbd>. Columns,
+                dates, and statuses are detected automatically!
+              </div>
+              <div class="paste-actions">
+                <button class="btn btn-primary btn-sm" id="btnHeroPaste">
+                  <i class="fa-solid fa-paste"></i> Open Paste Box
+                </button>
+                <button class="btn btn-secondary btn-sm" id="btnUploadFile">
+                  <i class="fa-solid fa-file-arrow-up"></i> Upload File (.xlsx,
+                  .csv)
+                </button>
+                <button class="btn btn-outline btn-sm" id="btnHeroSample">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Try Sample
+                  Data
+                </button>
+              </div>
             </div>
           </div>
-        </section>
 
-        <!-- ================================================================
-             VIEW 3: DATA RECORDS TABLE
+          <!-- Dynamic Universal Filters Section -->
+          <div
+            class="filter-card"
+            id="filterCardContainer"
+            style="display: none"
+          >
+            <!-- Populated dynamically by filters.js -->
+          </div>
+
+          <!-- ================================================================
+             VIEW 1: DASHBOARD
              ================================================================ -->
-        <section class="view-section" id="view-table">
-          <div class="table-card">
-            <div class="table-toolbar">
-              <div class="table-search-box">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="tableSearchInput" placeholder="Filter rows in this table...">
+          <section class="view-section active" id="view-dashboard">
+            <!-- Statistics Cards Grid Header -->
+            <div class="stats-header-bar">
+              <div class="section-heading">
+                <i class="fa-solid fa-gauge-high text-primary"></i>
+                <span>Dashboard Status Statistics</span>
+              </div>
+            </div>
+
+            <!-- Core & Detected Metrics Grid -->
+            <div class="stats-grid" id="dashboardMetricsGrid">
+              <!-- Dynamically populated by dashboard.js -->
+            </div>
+
+            <!-- Dynamic Status Chips Ribbon -->
+            <div class="dynamic-status-ribbon" id="statusRibbonContainer">
+              <!-- Dynamically populated by dashboard.js -->
+            </div>
+
+            <!-- Charts Visualization Section -->
+            <div id="chartsVisualizationWrapper" style="display: none">
+              <div class="section-heading" style="margin-bottom: 1rem">
+                <i class="fa-solid fa-chart-line text-primary"></i>
+                <span>Visual Analytics & Distribution</span>
               </div>
 
-              <div class="table-toolbar-actions">
-                <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted);">
-                  <span>Show</span>
-                  <select class="filter-select" id="tablePageSizeSelect" style="width: 80px; height: 34px;">
-                    <option value="10">10</option>
-                    <option value="25" selected>25</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                    <option value="500">500</option>
-                    <option value="all">All</option>
-                  </select>
-                  <span>rows</span>
+              <div class="charts-grid">
+                <!-- Chart 1: Status Distribution -->
+                <div class="chart-card">
+                  <div class="chart-header">
+                    <div class="chart-title">
+                      <i
+                        class="fa-solid fa-chart-pie"
+                        style="color: #4f46e5"
+                      ></i>
+                      <span>Status Distribution</span>
+                    </div>
+                  </div>
+                  <div class="chart-container">
+                    <canvas id="chartStatus"></canvas>
+                  </div>
+                </div>
+
+                <!-- Chart 2: Company Comparison -->
+                <div class="chart-card">
+                  <div class="chart-header">
+                    <div class="chart-title">
+                      <i
+                        class="fa-solid fa-building"
+                        style="color: #10b981"
+                      ></i>
+                      <span>Company Comparison</span>
+                    </div>
+                  </div>
+                  <div class="chart-container">
+                    <canvas id="chartCompany"></canvas>
+                  </div>
+                </div>
+
+                <!-- Chart 3: Category Breakdown -->
+                <div class="chart-card">
+                  <div class="chart-header">
+                    <div class="chart-title">
+                      <i
+                        class="fa-solid fa-layer-group"
+                        style="color: #06b6d4"
+                      ></i>
+                      <span>Category Breakdown</span>
+                    </div>
+                  </div>
+                  <div class="chart-container">
+                    <canvas id="chartCategory"></canvas>
+                  </div>
+                </div>
+
+                <!-- Chart 4: Supplier Performance -->
+                <div class="chart-card">
+                  <div class="chart-header">
+                    <div class="chart-title">
+                      <i
+                        class="fa-solid fa-truck-ramp-box"
+                        style="color: #f59e0b"
+                      ></i>
+                      <span>Supplier Performance</span>
+                    </div>
+                  </div>
+                  <div class="chart-container">
+                    <canvas id="chartSupplier"></canvas>
+                  </div>
+                </div>
+
+                <!-- Chart 5: Daily / Monthly Trends (Full Width) -->
+                <div class="chart-card full-width">
+                  <div class="chart-header">
+                    <div class="chart-title">
+                      <i
+                        class="fa-solid fa-chart-area"
+                        style="color: #8b5cf6"
+                      ></i>
+                      <span>Submission Trends Over Time</span>
+                    </div>
+                  </div>
+                  <div class="chart-container">
+                    <canvas id="chartTrend"></canvas>
+                  </div>
                 </div>
               </div>
             </div>
+          </section>
 
-            <div class="table-responsive-container">
-              <table class="custom-data-table" id="rawDataTable">
-                <thead id="dataTableHead">
-                  <!-- Dynamic headers -->
-                </thead>
-                <tbody id="dataTableBody">
-                  <!-- Dynamic rows -->
-                </tbody>
-              </table>
+          <!-- ================================================================
+             VIEW 2: DETAILED REPORTS MATRIX
+             ================================================================ -->
+          <section class="view-section" id="view-reports">
+            <div class="report-matrix-card">
+              <div class="report-controls-bar">
+                <div class="report-group-selector">
+                  <label
+                    ><i class="fa-solid fa-filter me-1"></i> Analyze By:</label
+                  >
+                  <div class="report-pills-nav">
+                    <button class="report-pill-btn active" data-dim="Company">
+                      Company
+                    </button>
+                    <button class="report-pill-btn" data-dim="Category">
+                      Category
+                    </button>
+                    <button class="report-pill-btn" data-dim="Supplier">
+                      Supplier
+                    </button>
+                    <button class="report-pill-btn" data-dim="Brand">
+                      Brand
+                    </button>
+                    <button class="report-pill-btn" data-dim="Status">
+                      Status
+                    </button>
+                    <button class="report-pill-btn" data-dim="Case Status">
+                      Case Status
+                    </button>
+                    <button class="report-pill-btn" data-dim="Date">
+                      Date
+                    </button>
+                    <button class="report-pill-btn" data-dim="ASIN">
+                      ASIN
+                    </button>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.75rem">
+                  <select
+                    class="filter-select"
+                    id="reportDimensionSelect"
+                    style="width: auto; min-width: 180px"
+                  >
+                    <!-- Dynamic options for other columns -->
+                  </select>
+                  <button
+                    class="btn btn-sm btn-success"
+                    id="btnExportReportExcel"
+                  >
+                    <i class="fa-solid fa-file-excel"></i> Export Report
+                  </button>
+                </div>
+              </div>
+
+              <div
+                class="p-3"
+                style="
+                  padding: 1rem 1.25rem 0.5rem;
+                  font-weight: 700;
+                  color: var(--text-main);
+                "
+                id="reportCurrentDimensionLabel"
+              >
+                Grouped Breakdown
+              </div>
+
+              <div class="table-responsive-container">
+                <table class="custom-data-table" id="reportDataTable">
+                  <thead id="reportTableHead">
+                    <!-- Generated dynamically by app.js -->
+                  </thead>
+                  <tbody id="reportTableBody">
+                    <!-- Generated dynamically by app.js -->
+                  </tbody>
+                </table>
+              </div>
             </div>
+          </section>
 
-            <div class="table-pagination" id="tablePaginationContainer">
-              <!-- Dynamic pagination -->
+          <!-- ================================================================
+             VIEW 3: DATA RECORDS TABLE
+             ================================================================ -->
+          <section class="view-section" id="view-table">
+            <div class="table-card">
+              <div class="table-toolbar">
+                <div class="table-search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input
+                    type="text"
+                    id="tableSearchInput"
+                    placeholder="Filter rows in this table..."
+                  />
+                </div>
+
+                <div class="table-toolbar-actions">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 0.4rem;
+                      font-size: 0.85rem;
+                      color: var(--text-muted);
+                    "
+                  >
+                    <span>Show</span>
+                    <select
+                      class="filter-select"
+                      id="tablePageSizeSelect"
+                      style="width: 80px; height: 34px"
+                    >
+                      <option value="10">10</option>
+                      <option value="25" selected>25</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                      <option value="all">All</option>
+                    </select>
+                    <span>rows</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive-container">
+                <table class="custom-data-table" id="rawDataTable">
+                  <thead id="dataTableHead">
+                    <!-- Dynamic headers -->
+                  </thead>
+                  <tbody id="dataTableBody">
+                    <!-- Dynamic rows -->
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="table-pagination" id="tablePaginationContainer">
+                <!-- Dynamic pagination -->
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <!-- ================================================================
+          <!-- ================================================================
              VIEW 4: PASTE / IMPORT DEDICATED VIEW
              ================================================================ -->
-        <section class="view-section" id="view-paste">
-          <div class="filter-card">
-            <div class="section-heading" style="margin-bottom: 0.75rem;">
-              <i class="fa-solid fa-paste text-primary"></i>
-              <span>Direct Excel Data Ingestion</span>
+          <section class="view-section" id="view-paste">
+            <div class="filter-card">
+              <div class="section-heading" style="margin-bottom: 0.75rem">
+                <i class="fa-solid fa-paste text-primary"></i>
+                <span>Direct Excel Data Ingestion</span>
+              </div>
+              <p
+                style="
+                  color: var(--text-muted);
+                  font-size: 0.9rem;
+                  margin-bottom: 1rem;
+                "
+              >
+                Paste tabular text copied directly from Microsoft Excel, Google
+                Sheets, or CSV files into the area below. All headers, rows,
+                dates, and gating statuses will be parsed instantly without
+                needing a server.
+              </p>
+
+              <textarea
+                class="paste-textarea"
+                id="viewPasteTextarea"
+                placeholder="Click here and press Ctrl + V to paste your Excel columns and rows..."
+              ></textarea>
+
+              <div
+                style="
+                  display: flex;
+                  gap: 0.75rem;
+                  margin-top: 1rem;
+                  justify-content: flex-end;
+                "
+              >
+                <button
+                  class="btn btn-secondary"
+                  onclick="
+                    document.getElementById('viewPasteTextarea').value = ''
+                  "
+                >
+                  Clear Box
+                </button>
+                <button class="btn btn-primary" onclick="App.openPasteModal()">
+                  <i class="fa-solid fa-bolt"></i> Process Pasted Data
+                </button>
+              </div>
             </div>
-            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
-              Paste tabular text copied directly from Microsoft Excel, Google Sheets, or CSV files into the area below. All headers, rows, dates, and gating statuses will be parsed instantly without needing a server.
-            </p>
-
-            <textarea class="paste-textarea" id="viewPasteTextarea" placeholder="Click here and press Ctrl + V to paste your Excel columns and rows..."></textarea>
-
-            <div style="display: flex; gap: 0.75rem; margin-top: 1rem; justify-content: flex-end;">
-              <button class="btn btn-secondary" onclick="document.getElementById('viewPasteTextarea').value = ''">
-                Clear Box
-              </button>
-              <button class="btn btn-primary" onclick="App.openPasteModal();">
-                <i class="fa-solid fa-bolt"></i> Process Pasted Data
-              </button>
-            </div>
-          </div>
-        </section>
-
-      </div>
-    </main>
-  </div>
-
-  <!-- Paste Modal Overlay -->
-  <div class="modal-overlay" id="pasteModal">
-    <div class="modal-card">
-      <div class="modal-header">
-        <div class="modal-title">
-          <i class="fa-solid fa-paste text-primary"></i>
-          <span>Paste Excel Ungating Data</span>
+          </section>
         </div>
-        <button class="modal-close-btn" id="closePasteModalBtn">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-      <div class="modal-body">
-        <p style="font-size: 0.88rem; color: var(--text-muted);">
-          Select your table in Excel, press <kbd style="font-weight: 700; border: 1px solid var(--border-color); padding: 1px 4px; border-radius: 4px;">Ctrl + C</kbd>, click into the box below and press <kbd style="font-weight: 700; border: 1px solid var(--border-color); padding: 1px 4px; border-radius: 4px;">Ctrl + V</kbd>.
-        </p>
-        <textarea class="paste-textarea" id="pasteModalTextarea" placeholder="Paste Excel columns and rows here (e.g. Company, Brand, Category, ASIN, Status, Date, Supplier)..."></textarea>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="clearPasteModalBtn">Clear</button>
-        <button class="btn btn-outline" id="cancelPasteModalBtn">Cancel</button>
-        <button class="btn btn-primary" id="submitPasteModalBtn">
-          <i class="fa-solid fa-check"></i> Parse & Generate Dashboard
-        </button>
+      </main>
+    </div>
+
+    <!-- Paste Modal Overlay -->
+    <div class="modal-overlay" id="pasteModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-paste text-primary"></i>
+            <span>Paste Excel Ungating Data</span>
+          </div>
+          <button class="modal-close-btn" id="closePasteModalBtn">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size: 0.88rem; color: var(--text-muted)">
+            Select your table in Excel, press
+            <kbd
+              style="
+                font-weight: 700;
+                border: 1px solid var(--border-color);
+                padding: 1px 4px;
+                border-radius: 4px;
+              "
+              >Ctrl + C</kbd
+            >, click into the box below and press
+            <kbd
+              style="
+                font-weight: 700;
+                border: 1px solid var(--border-color);
+                padding: 1px 4px;
+                border-radius: 4px;
+              "
+              >Ctrl + V</kbd
+            >.
+          </p>
+          <textarea
+            class="paste-textarea"
+            id="pasteModalTextarea"
+            placeholder="Paste Excel columns and rows here (e.g. Company, Brand, Category, ASIN, Status, Date, Supplier)..."
+          ></textarea>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-top: 0.75rem;
+              font-size: 0.85rem;
+              padding: 0.5rem 0.75rem;
+              background: var(--bg-surface);
+              border: 1px solid var(--border-color);
+              border-radius: 6px;
+            "
+          >
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                cursor: pointer;
+                user-select: none;
+              "
+            >
+              <input
+                type="checkbox"
+                id="chkAppendData"
+                checked
+                style="accent-color: var(--primary); width: 16px; height: 16px"
+              />
+              <span
+                ><strong>Multi-Sheet Mode:</strong> Append to existing dataset
+                and auto-block duplicates</span
+              >
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="clearPasteModalBtn">
+            Clear
+          </button>
+          <button class="btn btn-outline" id="cancelPasteModalBtn">
+            Cancel
+          </button>
+          <button class="btn btn-primary" id="submitPasteModalBtn">
+            <i class="fa-solid fa-check"></i> Parse & Generate Dashboard
+          </button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Hidden File Input for .xlsx / .csv uploads -->
-  <input type="file" id="fileUploadInput" accept=".xlsx,.xls,.csv,.tsv,.txt" style="display: none;">
+    <!-- Hidden File Input for .xlsx / .csv uploads -->
+    <input
+      type="file"
+      id="fileUploadInput"
+      accept=".xlsx,.xls,.csv,.tsv,.txt"
+      style="display: none"
+    />
 
-  <!-- Application Modular Scripts in Dependency Order -->
-  <script src="js/parser.js"></script>
-  <script src="js/filters.js"></script>
-  <script src="js/dashboard.js"></script>
-  <script src="js/charts.js"></script>
-  <script src="js/export.js"></script>
-  <script src="js/app.js"></script>
+    <!-- Application Modular Scripts in Dependency Order -->
+    <script src="js/parser.js"></script>
+    <script src="js/filters.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/export.js"></script>
+    <script src="js/app.js"></script>
 
-  <script>
-    // Wire up dedicated paste view button
-    document.addEventListener('DOMContentLoaded', () => {
-      const viewTextarea = document.getElementById('viewPasteTextarea');
-      if (viewTextarea) {
-        viewTextarea.addEventListener('paste', (e) => {
-          setTimeout(() => {
-            if (viewTextarea.value.trim()) {
-              App.openPasteModal();
-              const modalTextarea = document.getElementById('pasteModalTextarea');
-              if (modalTextarea) {
-                modalTextarea.value = viewTextarea.value;
+    <script>
+      // Wire up dedicated paste view button
+      document.addEventListener("DOMContentLoaded", () => {
+        const viewTextarea = document.getElementById("viewPasteTextarea");
+        if (viewTextarea) {
+          viewTextarea.addEventListener("paste", (e) => {
+            setTimeout(() => {
+              if (viewTextarea.value.trim()) {
+                App.openPasteModal();
+                const modalTextarea =
+                  document.getElementById("pasteModalTextarea");
+                if (modalTextarea) {
+                  modalTextarea.value = viewTextarea.value;
+                }
               }
-            }
-          }, 50);
-        });
-      }
-    });
-  </script>
-</body>
+            }, 50);
+          });
+        }
+      });
+    </script>
+  </body>
 </html>
-

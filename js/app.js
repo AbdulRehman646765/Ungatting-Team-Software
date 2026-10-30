@@ -268,7 +268,9 @@ var App = (function () {
           showToast('Please paste some Excel data first.', 'warning');
           return;
         }
-        processRawText(text);
+        const chkAppend = document.getElementById('chkAppendData');
+        const forceReplace = chkAppend ? !chkAppend.checked : false;
+        processRawText(text, forceReplace);
         closePasteModal();
       });
     }
@@ -370,36 +372,133 @@ var App = (function () {
   }
 
   /**
-   * Parse and ingest raw copied/uploaded text
+   * Helper to create a unique fingerprint for a row to detect duplicates across sheets
    */
-  function processRawText(rawText) {
+  function getRowFingerprint(row, detectedColumns) {
+    const d = detectedColumns || {};
+    const asin = (d.asinCol && row[d.asinCol] ? row[d.asinCol].toString().trim().toUpperCase() : '');
+    const caseId = (d.caseIdCol && row[d.caseIdCol] ? row[d.caseIdCol].toString().trim() : '');
+    const company = (d.companyCol && row[d.companyCol] ? row[d.companyCol].toString().trim().toLowerCase() : '');
+    const brand = (d.brandCol && row[d.brandCol] ? row[d.brandCol].toString().trim().toLowerCase() : '');
+    const cat = (d.categoryCol && row[d.categoryCol] ? row[d.categoryCol].toString().trim().toLowerCase() : '');
+    const sup = (d.supplierCol && row[d.supplierCol] ? row[d.supplierCol].toString().trim().toLowerCase() : '');
+    const date = (d.dateCol && row[d.dateCol] ? row[d.dateCol].toString().trim() : '');
+    const qty = (d.unitsCol && row[d.unitsCol] !== undefined ? row[d.unitsCol].toString().trim() : '');
+    const accStat = (row._canonicalAccountStatus || (d.accountStatusCol && row[d.accountStatusCol]) || '').toString().trim().toLowerCase();
+    const caseLog = (row._canonicalCaseLog || (d.caseLogCol && row[d.caseLogCol]) || '').toString().trim().toLowerCase();
+    const caseStat = (row._canonicalCaseStatus || (d.caseStatusCol && row[d.caseStatusCol]) || '').toString().trim().toLowerCase();
+
+    if (asin) {
+      if (caseId) {
+        return `asin:${asin}|case:${caseId}|acc:${accStat}|log:${caseLog}|reopen:${caseStat}`;
+      }
+      return `asin:${asin}|comp:${company}|brand:${brand}|cat:${cat}|sup:${sup}|qty:${qty}|date:${date}|acc:${accStat}|log:${caseLog}|reopen:${caseStat}`;
+    }
+
+    // Fallback: concatenate all non-internal keys
+    return Object.keys(row)
+      .filter(k => !k.startsWith('_'))
+      .sort()
+      .map(k => `${k}:${(row[k] !== undefined && row[k] !== null ? row[k].toString().trim().toLowerCase() : '')}`)
+      .join('|');
+  }
+
+  /**
+   * Parse and ingest raw copied/uploaded text with Multi-Sheet Append and Duplicate Protection
+   */
+  function processRawText(rawText, forceReplace = false) {
     try {
       const parsed = DataParser.parseText(rawText);
-      state.dataset = parsed;
-      state.filteredRows = [...parsed.rows];
-      state.currentPage = 1;
+      if (!parsed || !parsed.rows || parsed.rows.length === 0) {
+        showToast('No tabular rows found in pasted data.', 'warning');
+        return;
+      }
 
-      // Update Header badge & quick stats
-      updateDatasetBadge(parsed.totalRows, parsed.totalColumns);
+      // Check if we already have an active dataset and are NOT replacing
+      if (state.dataset && state.dataset.rows && state.dataset.rows.length > 0 && !forceReplace) {
+        const existingFingerprints = new Set();
+        state.dataset.rows.forEach(r => {
+          existingFingerprints.add(getRowFingerprint(r, state.dataset.detectedColumns));
+        });
 
-      // Build Dynamic Filters UI
-      const filterContainer = document.getElementById('filterCardContainer');
-      FilterManager.buildFilterUI(parsed, parsed.detectedColumns, filterContainer);
+        const newUniqueRows = [];
+        let duplicateCount = 0;
 
-      // Render Dashboard Cards & Status Ribbon
-      refreshDashboardViews();
+        parsed.rows.forEach(incomingRow => {
+          const fp = getRowFingerprint(incomingRow, parsed.detectedColumns || state.dataset.detectedColumns);
+          if (existingFingerprints.has(fp)) {
+            duplicateCount++;
+          } else {
+            existingFingerprints.add(fp);
+            incomingRow._id = `row_${state.dataset.rows.length + newUniqueRows.length + 1}`;
+            newUniqueRows.push(incomingRow);
+          }
+        });
 
-      // Render Data Table
-      renderTable();
+        // Case 1: All incoming rows are duplicates
+        if (newUniqueRows.length === 0 && duplicateCount > 0) {
+          showToast(`❌ Duplicate Error: All ${duplicateCount} records already exist in dataset! No duplicates were added.`, 'error');
+          return;
+        }
 
-      // Render Reports Matrix
-      setupReportDimensionDropdown();
-      renderReportBreakdown();
+        // Merge headers and fill missing detected column roles
+        const mergedHeaders = Array.from(new Set([...state.dataset.headers, ...parsed.headers]));
+        state.dataset.headers = mergedHeaders;
+
+        if (parsed.detectedColumns) {
+          Object.keys(parsed.detectedColumns).forEach(k => {
+            if (!state.dataset.detectedColumns[k] && parsed.detectedColumns[k]) {
+              state.dataset.detectedColumns[k] = parsed.detectedColumns[k];
+            }
+          });
+        }
+
+        // Append new unique rows
+        state.dataset.rows.push(...newUniqueRows);
+        state.dataset.totalRows = state.dataset.rows.length;
+        state.dataset.totalColumns = mergedHeaders.length;
+
+        // Reset to page 1 and apply filters
+        state.filteredRows = FilterManager.filterRows(state.dataset.rows, state.dataset.detectedColumns);
+        state.currentPage = 1;
+
+        // Rebuild filter UI with combined dataset
+        const filterContainer = document.getElementById('filterCardContainer');
+        FilterManager.buildFilterUI(state.dataset, state.dataset.detectedColumns, filterContainer);
+
+        // Update badge, quick stats, views, charts, and table
+        updateDatasetBadge(state.dataset.totalRows, state.dataset.totalColumns);
+        refreshDashboardViews();
+        renderTable();
+        setupReportDimensionDropdown();
+        renderReportBreakdown();
+
+        if (duplicateCount > 0) {
+          showToast(`➕ Added ${newUniqueRows.length} new records! ⚠️ ${duplicateCount} duplicate records were detected and skipped.`, 'warning');
+        } else {
+          showToast(`➕ Added ${newUniqueRows.length} new records from sheet! Total records: ${formatNumber(state.dataset.totalRows)}`, 'success');
+        }
+      } else {
+        // Initial load / First sheet or forced replace
+        state.dataset = parsed;
+        state.filteredRows = [...parsed.rows];
+        state.currentPage = 1;
+
+        updateDatasetBadge(parsed.totalRows, parsed.totalColumns);
+
+        const filterContainer = document.getElementById('filterCardContainer');
+        FilterManager.buildFilterUI(parsed, parsed.detectedColumns, filterContainer);
+
+        refreshDashboardViews();
+        renderTable();
+        setupReportDimensionDropdown();
+        renderReportBreakdown();
+
+        showToast(`✅ Successfully loaded ${formatNumber(parsed.totalRows)} records across ${parsed.totalColumns} columns!`, 'success');
+      }
 
       // Switch to dashboard view
       switchView('dashboard');
-
-      showToast(`Successfully parsed ${formatNumber(parsed.totalRows)} rows across ${parsed.totalColumns} columns!`, 'success');
     } catch (err) {
       console.error(err);
       showToast(err.message || 'Failed to parse clipboard data. Ensure it is tabular.', 'error');
@@ -408,7 +507,7 @@ var App = (function () {
 
   function loadSampleData(silent = false) {
     const sampleTsv = DataParser.generateSampleData();
-    processRawText(sampleTsv);
+    processRawText(sampleTsv, true);
     if (!silent) {
       showToast('Loaded realistic Amazon Ungating sample dataset!', 'success');
     }
@@ -1064,6 +1163,46 @@ var App = (function () {
         DataExporter.exportToPDF(state.filteredRows, state.dataset.headers);
       });
     }
+
+    const btnExportClickUp = document.getElementById('btnExportClickUp');
+    if (btnExportClickUp) {
+      btnExportClickUp.addEventListener('click', () => {
+        if (!state.dataset || state.filteredRows.length === 0) {
+          showToast('No data available to generate ClickUp report.', 'warning');
+          return;
+        }
+        const reportText = DataExporter.generateClickUpReport(
+          state.filteredRows,
+          state.dataset.detectedColumns,
+          state.statusStats
+        );
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(reportText).then(() => {
+            showToast('ClickUp summary report copied to clipboard!', 'success');
+          }).catch(() => {
+            copyFallback(reportText);
+          });
+        } else {
+          copyFallback(reportText);
+        }
+      });
+    }
+
+    function copyFallback(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('ClickUp summary report copied to clipboard!', 'success');
+      } catch (e) {
+        showToast('Unable to auto-copy. Please export via CSV/Excel.', 'error');
+      }
+      document.body.removeChild(ta);
+    }
   }
 
   /* ==========================================================================
@@ -1131,7 +1270,8 @@ var App = (function () {
     processRawText,
     clearData,
     switchView,
-    showToast
+    showToast,
+    getState: () => state
   };
 })();
 

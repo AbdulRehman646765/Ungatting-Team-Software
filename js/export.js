@@ -166,11 +166,94 @@ var DataExporter = (function () {
     }
   }
 
+  /**
+   * Generate clean, professional ClickUp report text
+   */
+  function generateClickUpReport(rows, detectedColumns, stats) {
+    if (!rows || rows.length === 0) return '';
+
+    const total = rows.length;
+    const counts = (stats && stats.counts) ? stats.counts : {};
+
+    const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    // Distinct companies
+    const compCol = detectedColumns ? detectedColumns.companyCol : null;
+    const compCounts = {};
+    if (compCol) {
+      rows.forEach(r => {
+        const c = r[compCol];
+        if (c) compCounts[c] = (compCounts[c] || 0) + 1;
+      });
+    }
+    const compList = Object.entries(compCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([c, n]) => `${c} (${n})`)
+      .join(' | ');
+
+    let report = `🚀 **Amazon Ungating Daily Progress Report**\n`;
+    report += `📅 **Date:** ${today} | **Total Batch Size:** ${total} ASINs\n\n`;
+
+    report += `📊 **Summary Breakdown:**\n`;
+    const ungateCount = counts['Ungate'] || 0;
+    const appCount = counts['Approved'] || 0;
+    const autoCount = counts['Auto Ungate'] || 0;
+    const revCount = counts['Review'] || 0;
+    const rejCount = counts['Rejected'] || 0;
+
+    if (ungateCount > 0) report += `• ✅ **Ungated (Success):** ${ungateCount} (${((ungateCount / total) * 100).toFixed(1)}%)\n`;
+    if (appCount > 0) report += `• 🟢 **Approved:** ${appCount}\n`;
+    if (autoCount > 0) report += `• ⚡ **Auto Ungate:** ${autoCount}\n`;
+    if (revCount > 0) report += `• ⏳ **Under Review:** ${revCount}\n`;
+    if (rejCount > 0) report += `• ❌ **Rejected:** ${rejCount} (${((rejCount / total) * 100).toFixed(1)}%)\n`;
+    if (counts['Copy Listed']) report += `• 📋 **Copy Listed:** ${counts['Copy Listed']}\n`;
+    if (counts['Invoice Submitted']) report += `• 🧾 **Invoice Submitted:** ${counts['Invoice Submitted']}\n`;
+
+    // Case and Ticket Statuses
+    const ticketItems = [];
+    if (counts['Case Open']) ticketItems.push(`• 📂 **Case Open:** ${counts['Case Open']}`);
+    if (counts['Case Re-open 1']) ticketItems.push(`• 🔄 **Case Re-open 1:** ${counts['Case Re-open 1']}`);
+    if (counts['Case Re-open 2']) ticketItems.push(`• 🔄 **Case Re-open 2:** ${counts['Case Re-open 2']}`);
+    if (counts['Case Re-open 3']) ticketItems.push(`• 🔄 **Case Re-open 3:** ${counts['Case Re-open 3']}`);
+    if (counts['Case Re-open 4']) ticketItems.push(`• 🔄 **Case Re-open 4:** ${counts['Case Re-open 4']}`);
+    if (counts['Case Re-open 5']) ticketItems.push(`• 🔄 **Case Re-open 5:** ${counts['Case Re-open 5']}`);
+    if (counts['Re-Apply']) ticketItems.push(`• ⚠️ **Re-Apply Needed:** ${counts['Re-Apply']}`);
+    if (counts['Under Review'] && counts['Under Review'] !== revCount) {
+      ticketItems.push(`• 🔍 **Under Review (Log):** ${counts['Under Review']}`);
+    }
+
+    if (ticketItems.length > 0) {
+      report += `\n🎫 **Case & Ticket Activity:**\n` + ticketItems.join('\n') + '\n';
+    }
+
+    if (compList) {
+      report += `\n🏢 **Accounts Handled:**\n${compList}\n`;
+    }
+
+    report += `\n🎯 **Action Items & Next Steps:**\n`;
+    if (counts['Case Open'] || counts['Case Re-open 1']) {
+      report += `1. Follow-up on active Seller Support cases for resolution.\n`;
+    }
+    if (rejCount > 0) {
+      report += `2. Investigate rejection reasons and gather revised supplier documentation.\n`;
+    }
+    if (counts['Re-Apply']) {
+      report += `3. Prepare re-applications for ${counts['Re-Apply']} flagged ASINs.\n`;
+    }
+    if (ungateCount > 0) {
+      report += `4. Verify catalog listing accessibility for newly ungated ASINs.\n`;
+    }
+
+    return report;
+  }
+
   return {
     exportToExcel,
     exportReportMatrixToExcel,
     exportToCSV,
-    exportToPDF
+    exportToPDF,
+    generateClickUpReport
   };
 })();
 
