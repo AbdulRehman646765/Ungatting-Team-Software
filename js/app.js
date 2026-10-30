@@ -72,9 +72,11 @@ var App = (function () {
       });
     }
 
-    // App starts clean — user pastes their own data.
-    // Initialize empty state cleanly
-    clearData(true);
+    // Try restoring data from localStorage first (survives page refresh)
+    if (!tryRestoreFromLocalStorage()) {
+      // App starts clean — user pastes their own data.
+      clearData(true);
+    }
   }
 
   /* ==========================================================================
@@ -197,6 +199,16 @@ var App = (function () {
     // If switching to software hub, render it
     if (viewName === 'software') {
       renderSoftwareHub();
+    }
+
+    // Hide filter panel on paste view; show it elsewhere only if dataset is loaded
+    const filterCard = document.getElementById('filterCardContainer');
+    if (filterCard) {
+      if (viewName === 'paste') {
+        filterCard.style.display = 'none';
+      } else if (state.dataset) {
+        filterCard.style.display = 'block';
+      }
     }
   }
 
@@ -515,6 +527,8 @@ var App = (function () {
         } else {
           showToast(`➕ Added ${newUniqueRows.length} new records from sheet! Total records: ${formatNumber(state.dataset.totalRows)}`, 'success');
         }
+        // Persist merged dataset to localStorage
+        saveToLocalStorage();
       } else {
         // Initial load / First sheet or forced replace
         state.dataset = parsed;
@@ -532,6 +546,8 @@ var App = (function () {
         renderReportBreakdown();
 
         showToast(`✅ Successfully loaded ${formatNumber(parsed.totalRows)} records across ${parsed.totalColumns} columns!`, 'success');
+        // Persist dataset to localStorage so it survives page refresh
+        saveToLocalStorage();
       }
 
       // Switch to dashboard view
@@ -679,7 +695,61 @@ var App = (function () {
     if (!silent) {
       showToast('All data cleared. Paste your Excel data to begin.', 'info');
     }
+    // Also clear localStorage so it doesn't reload on next refresh
+    try { localStorage.removeItem('ungate_dataset'); } catch (e) { /* ignore */ }
     switchView('dashboard');
+  }
+
+  /* ==========================================================================
+     localStorage Persistence — Save / Restore Dataset Across Page Refreshes
+     ========================================================================== */
+
+  /**
+   * Serialize current dataset to localStorage for persistence across refreshes.
+   * Skips internal _* fields when saving — they are recomputed on re-parse.
+   */
+  function saveToLocalStorage() {
+    if (!state.dataset || !state.dataset.rows || state.dataset.rows.length === 0) return;
+    try {
+      const payload = {
+        headers: state.dataset.headers,
+        rows: state.dataset.rows,
+        detectedColumns: state.dataset.detectedColumns
+      };
+      localStorage.setItem('ungate_dataset', JSON.stringify(payload));
+    } catch (e) {
+      // Quota exceeded or private mode — silently ignore
+      console.warn('[LocalStorage] Could not save dataset:', e.message);
+    }
+  }
+
+  /**
+   * On page load, attempt to restore dataset from localStorage.
+   * Re-processes the raw TSV so all _canonical fields and detection logic re-run.
+   * Returns true if data was restored, false otherwise.
+   */
+  function tryRestoreFromLocalStorage() {
+    try {
+      const saved = localStorage.getItem('ungate_dataset');
+      if (!saved) return false;
+      const obj = JSON.parse(saved);
+      if (!obj || !obj.rows || obj.rows.length === 0 || !obj.headers || obj.headers.length === 0) return false;
+
+      // Reconstruct a TSV string from saved headers + rows so DataParser can re-run detection
+      const lines = [obj.headers.join('\t')];
+      obj.rows.forEach(r => {
+        lines.push(obj.headers.map(h => (r[h] !== undefined && r[h] !== null ? r[h] : '')).join('\t'));
+      });
+      const tsv = lines.join('\r\n');
+
+      // processRawText will re-parse, rebuild state, render everything
+      processRawText(tsv, true);
+      return true;
+    } catch (e) {
+      console.warn('[LocalStorage] Could not restore dataset:', e.message);
+      try { localStorage.removeItem('ungate_dataset'); } catch (_) { /* ignore */ }
+      return false;
+    }
   }
 
   function applyCurrentFilters() {
@@ -838,7 +908,11 @@ var App = (function () {
         } else if (/asin/i.test(lowerH)) {
           const sw = r._software || '';
           const swCls = getSoftwareCssClass(sw);
-          tbodyHtml += `<td><span class="asin-cell-badge asin-software-${swCls}">${escapeHtml(val)}</span></td>`;
+          if (swCls === 'unassigned') {
+            tbodyHtml += `<td><span style="font-weight:700;font-family:'JetBrains Mono',monospace;font-size:0.82rem;">${escapeHtml(val)}</span></td>`;
+          } else {
+            tbodyHtml += `<td><span class="asin-cell-badge asin-software-${swCls}">${escapeHtml(val)}</span></td>`;
+          }
         } else if (/software/i.test(lowerH) || h === (state.dataset && state.dataset.detectedColumns ? state.dataset.detectedColumns.softwareCol : '')) {
           const swVal = val || r._software || '';
           const swCls = getSoftwareCssClass(swVal);

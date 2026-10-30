@@ -96,13 +96,15 @@ var DashboardManager = (function () {
 
     let cardsHtml = '';
 
-    // Render Core Status Cards
+    // Render Core Status Cards — only show Total Records always; all others only if count > 0
     CORE_STATUS_CONFIG.forEach(cfg => {
       const value = counts[cfg.key] || 0;
-      const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
       const isTotal = cfg.key === 'Total Records';
 
-      // Always show Total Records and any status that has value > 0 or is critical
+      // Skip zero-count cards (except Total Records which always shows)
+      if (!isTotal && value === 0) return;
+
+      const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
       cardsHtml += `
         <div class="stat-card" style="--card-accent: ${cfg.color}; --card-light: ${cfg.light};">
           <div class="stat-card-top">
