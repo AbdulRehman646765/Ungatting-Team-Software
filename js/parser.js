@@ -346,6 +346,117 @@ var DataParser = (function () {
   }
 
   /**
+   * Helper to get the previous calendar day in YYYY-MM-DD format
+   */
+  function getPreviousDay(ymdStr) {
+    if (!ymdStr || typeof ymdStr !== "string") return ymdStr;
+    const parts = ymdStr.split("-");
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      const dt = new Date(Date.UTC(y, m, d));
+      dt.setUTCDate(dt.getUTCDate() - 1);
+      const prevY = dt.getUTCFullYear();
+      const prevM = String(dt.getUTCMonth() + 1).padStart(2, "0");
+      const prevD = String(dt.getUTCDate()).padStart(2, "0");
+      return `${prevY}-${prevM}-${prevD}`;
+    }
+    return ymdStr;
+  }
+
+  /**
+   * Parse timestamp string and compute Shift Date and Shift Window.
+   * Shift rules (promt msg.tst):
+   * - Shift runs 5:00 PM (17:00) to 1:00 AM (next day)
+   * - 5:00 PM (17:00) to 11:59 PM (23:59) -> belongs to that day's shift
+   * - 12:00 AM (00:00) to 1:00 AM (01:00:59) -> belongs to PREVIOUS day's shift
+   * - Activities outside (01:01 to 16:59) -> "Outside Shift"
+   */
+  function parseDateTimeAndShift(rawStr, fallbackDateStr) {
+    if (!rawStr || typeof rawStr !== "string") {
+      if (fallbackDateStr) {
+        return {
+          raw: "",
+          date: fallbackDateStr,
+          time: "",
+          hours: null,
+          minutes: null,
+          isShift: null,
+          shiftDate: fallbackDateStr,
+          shiftWindow: "Date Only",
+        };
+      }
+      return null;
+    }
+
+    const s = rawStr.trim();
+    if (!s) return null;
+
+    let hours = 0;
+    let minutes = 0;
+    let hasTime = false;
+    let timePart = "";
+
+    // Check if string contains time components: hh:mm with optional AM/PM or seconds
+    const timeMatch = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);
+    if (timeMatch) {
+      hasTime = true;
+      hours = parseInt(timeMatch[1], 10);
+      minutes = parseInt(timeMatch[2], 10);
+      const ampm = timeMatch[3] ? timeMatch[3].toUpperCase() : "";
+      if (ampm === "PM" && hours < 12) hours += 12;
+      if (ampm === "AM" && hours === 12) hours = 0;
+      timePart = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    }
+
+    // Extract date part
+    let datePart = "";
+    const dateMatch = s.match(/(\d{1,4})[-/.](\d{1,2})[-/.](\d{1,4})/);
+    if (dateMatch) {
+      datePart = normalizeDateStr(dateMatch[0]);
+    } else if (fallbackDateStr) {
+      datePart = fallbackDateStr;
+    }
+
+    if (!datePart) return null;
+
+    let isShift = false;
+    let shiftWindow = "Outside Shift";
+    let shiftDate = datePart;
+
+    if (hasTime) {
+      // 5:00 PM (17:00) to 11:59 PM (23:59:59)
+      if (hours >= 17 && hours <= 23) {
+        isShift = true;
+        shiftWindow = "Night Shift (5 PM - 1 AM)";
+        shiftDate = datePart;
+      }
+      // 12:00 AM (00:00) to 1:00 AM (01:00:59) -> belongs to previous calendar day's shift
+      else if (hours === 0 || (hours === 1 && minutes === 0)) {
+        isShift = true;
+        shiftWindow = "Night Shift (5 PM - 1 AM)";
+        shiftDate = getPreviousDay(datePart);
+      } else {
+        isShift = false;
+        shiftWindow = "Outside Shift";
+        shiftDate = datePart;
+      }
+    }
+
+    return {
+      raw: s,
+      date: datePart,
+      time: timePart,
+      hours: hasTime ? hours : null,
+      minutes: hasTime ? minutes : null,
+      isShift: hasTime ? isShift : null,
+      shiftDate: shiftDate,
+      shiftWindow: shiftWindow,
+    };
+  }
+
+  /**
    * Determine whether the first row of parsed matrix is a header row or data
    */
   function detectIfHeaderRow(firstRow) {
@@ -389,7 +500,10 @@ var DataParser = (function () {
       "software",
       "tool",
       "more",
-      "less"
+      "less",
+      "time",
+      "shift",
+      "timestamp",
     ];
     const matches = firstRow.filter((cell) => {
       const l = (cell || "").toLowerCase().trim();
@@ -463,8 +577,49 @@ var DataParser = (function () {
       ];
     }
 
-    // Fast path: if 14 or more columns (Google Sheets A through N where Col N is Software)
-    if (numCols >= 14 && /^B0/i.test((dataRows[0][0] || "").trim())) {
+    // Fast path: if exactly 14 columns (with Software + Status Time)
+    if (numCols === 14 && /^B0/i.test((dataRows[0][0] || "").trim())) {
+      return [
+        "ASINS",
+        "Date",
+        "Company Name",
+        "Brand Name",
+        "Quantity",
+        "Account Status",
+        "Category",
+        "Popular Supplier Name",
+        "Case Log",
+        "Case ID",
+        "Case re-open",
+        "More/Less",
+        "Software",
+        "Status Time",
+      ];
+    }
+
+    // Fast path: if exactly 15 columns (Columns A through O in Google Sheets: Software, Status Time, Case Activity Time)
+    if (numCols === 15 && /^B0/i.test((dataRows[0][0] || "").trim())) {
+      return [
+        "ASINS",
+        "Date",
+        "Company Name",
+        "Brand Name",
+        "Quantity",
+        "Account Status",
+        "Category",
+        "Popular Supplier Name",
+        "Case Log",
+        "Case ID",
+        "Case re-open",
+        "More/Less",
+        "Software",
+        "Status Time",
+        "Case Activity Time",
+      ];
+    }
+
+    // Fast path: if 16 or more columns
+    if (numCols >= 16 && /^B0/i.test((dataRows[0][0] || "").trim())) {
       const h = [
         "ASINS",
         "Date",
@@ -478,11 +633,13 @@ var DataParser = (function () {
         "Case ID",
         "Case re-open",
         "More/Less",
+        "Software",
+        "Status Time",
+        "Case Activity Time",
       ];
-      for (let k = 12; k < numCols - 1; k++) {
+      for (let k = 15; k < numCols; k++) {
         h.push(`Column_${k + 1}`);
       }
-      h.push("Software");
       return h;
     }
 
@@ -938,6 +1095,8 @@ var DataParser = (function () {
       caseIdCol: null,
       softwareCol: null,
       moreLessCol: null,
+      statusTimeCol: null,
+      caseActivityTimeCol: null,
     };
 
     // Candidate scores
@@ -945,6 +1104,30 @@ var DataParser = (function () {
 
     headers.forEach((h) => {
       const lowerH = h.toLowerCase().trim();
+
+      // Check Status Time (Column N)
+      if (!roles.statusTimeCol) {
+        if (
+          /^(status[\s_-]?time|status[\s_-]?timestamp|status[\s_-]?date[\s_-]?time|last[\s_-]?status[\s_-]?time)$/i.test(
+            lowerH,
+          ) ||
+          lowerH === "status time"
+        ) {
+          roles.statusTimeCol = h;
+        }
+      }
+
+      // Check Case Activity Time (Column O)
+      if (!roles.caseActivityTimeCol) {
+        if (
+          /^(case[\s_-]?activity[\s_-]?time|case[\s_-]?time|case[\s_-]?timestamp|re-?open[\s_-]?time|case[\s_-]?re-?open[\s_-]?time)$/i.test(
+            lowerH,
+          ) ||
+          lowerH === "case activity time"
+        ) {
+          roles.caseActivityTimeCol = h;
+        }
+      }
 
       // Check Software
       if (!roles.softwareCol) {
@@ -1039,9 +1222,9 @@ var DataParser = (function () {
       // Check Date
       if (!roles.dateCol) {
         if (
-          /^(date|applied date|submitted date|created date|application date|timestamp|date applied)$/i.test(
+          /^(date|applied date|submitted date|created date|application date|date applied)$/i.test(
             lowerH,
-          )
+          ) && !/time|status|case/i.test(lowerH)
         ) {
           roles.dateCol = h;
         }
@@ -1209,6 +1392,8 @@ var DataParser = (function () {
     const caseStatusKey = detectedColumns.caseStatusCol;
     const softwareKey = detectedColumns.softwareCol;
     const dateKey = detectedColumns.dateCol;
+    const statusTimeKey = detectedColumns.statusTimeCol;
+    const caseActivityTimeKey = detectedColumns.caseActivityTimeCol;
 
     rows.forEach((r) => {
       let rawStatus = statusKey ? (r[statusKey] || "").toString().trim() : "";
@@ -1222,6 +1407,29 @@ var DataParser = (function () {
       let rawSoftware = softwareKey
         ? (r[softwareKey] || "").toString().trim()
         : "";
+      let rawStatusTime = statusTimeKey
+        ? (r[statusTimeKey] || "").toString().trim()
+        : "";
+      let rawCaseTime = caseActivityTimeKey
+        ? (r[caseActivityTimeKey] || "").toString().trim()
+        : "";
+
+      // Fallback: If statusTime or caseActivityTime is empty, scan columns for timestamp patterns
+      if (!rawStatusTime || !rawCaseTime) {
+        for (const k of Object.keys(r)) {
+          if (k.startsWith('_')) continue;
+          const val = (r[k] || '').toString().trim();
+          if (/\d{1,2}:\d{2}\s*(?:AM|PM)?/i.test(val) && /\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}/.test(val)) {
+            if (!rawStatusTime && k !== caseActivityTimeKey) {
+              rawStatusTime = val;
+              if (!detectedColumns.statusTimeCol) detectedColumns.statusTimeCol = k;
+            } else if (!rawCaseTime && k !== statusTimeKey && k !== detectedColumns.statusTimeCol) {
+              rawCaseTime = val;
+              if (!detectedColumns.caseActivityTimeCol) detectedColumns.caseActivityTimeCol = k;
+            }
+          }
+        }
+      }
 
       // Fallback: If rawSoftware is blank, scan all non-internal columns of this row
       if (!rawSoftware) {
@@ -1270,13 +1478,33 @@ var DataParser = (function () {
       const statCan = canonicalize(rawStatus);
 
       const rawDate = dateKey ? (r[dateKey] || "").toString().trim() : "";
-      r._normalizedDate = normalizeDateStr(rawDate);
+      const normDate = normalizeDateStr(rawDate);
+      r._normalizedDate = normDate;
       r._canonicalAccountStatus = accCan;
       r._canonicalCaseLog = logCan;
       r._canonicalCaseStatus = caseCan;
       r._software = normalizeSoftwareName(rawSoftware);
       // Primary status: prefer Case Log outcome (Review, Rejected, Ungate), then status, then Account Status
       r._canonicalStatus = logCan || statCan || accCan || "Unknown";
+
+      // Parse Timestamps and Shift Activity (5:00 PM - 1:00 AM)
+      const stParsed = parseDateTimeAndShift(rawStatusTime, normDate);
+      const catParsed = parseDateTimeAndShift(rawCaseTime, normDate);
+
+      r._statusTime = rawStatusTime;
+      r._caseActivityTime = rawCaseTime;
+
+      // Prefer statusTime for shift calculation; fallback to caseActivityTime or normDate
+      const activeShiftInfo = (stParsed && stParsed.isShift !== null) ? stParsed : ((catParsed && catParsed.isShift !== null) ? catParsed : null);
+      if (activeShiftInfo) {
+        r._isShift = activeShiftInfo.isShift;
+        r._shiftWindow = activeShiftInfo.shiftWindow;
+        r._shiftDate = activeShiftInfo.shiftDate;
+      } else {
+        r._isShift = null;
+        r._shiftWindow = "Standard";
+        r._shiftDate = normDate;
+      }
     });
   }
 
@@ -1387,6 +1615,36 @@ var DataParser = (function () {
 
       const moreLessVal = i % 3 === 0 ? "More" : (i % 3 === 1 ? "Less" : "");
 
+      // Generate realistic shift timestamps (Shift: 5:00 PM to 1:00 AM next day)
+      // Some in the evening (17:00 - 23:59), some after midnight (00:00 - 01:00)
+      const isPastMidnight = i % 6 === 0;
+      let actHour, actMin, actDate;
+      if (isPastMidnight) {
+        // Next calendar day between 12:00 AM and 01:00 AM (shiftDate correctly resolves to dateStr!)
+        actHour = 0;
+        actMin = (i * 9) % 60;
+        const dNext = new Date(d.getTime() + 24 * 60 * 60 * 1000);
+        actDate = dNext.toISOString().split("T")[0];
+      } else {
+        // Same day between 5:00 PM (17) and 11:59 PM (23)
+        actHour = 17 + (i % 7);
+        actMin = (i * 11) % 60;
+        actDate = dateStr;
+      }
+
+      const dParts = actDate.split("-");
+      const formattedDate = `${dParts[1]}/${dParts[2]}/${dParts[0]}`;
+      const ampm = actHour >= 12 ? "PM" : "AM";
+      const displayHour = actHour === 0 ? 12 : (actHour > 12 ? actHour - 12 : actHour);
+      const timeStr = `${String(displayHour).padStart(2, "0")}:${String(actMin).padStart(2, "0")} ${ampm}`;
+      const statusTimeVal = `${formattedDate} ${timeStr}`;
+
+      let caseActTimeVal = "";
+      if (caseReopen !== "0 case re-open") {
+        const cMin = (actMin + 18) % 60;
+        caseActTimeVal = `${formattedDate} ${String(displayHour).padStart(2, "0")}:${String(cMin).padStart(2, "0")} ${ampm}`;
+      }
+
       rows.push({
         ASINS: asin,
         Date: dateStr,
@@ -1401,6 +1659,8 @@ var DataParser = (function () {
         "Case re-open": caseReopen,
         "More/Less": moreLessVal,
         Software: softwareVal,
+        "Status Time": statusTimeVal,
+        "Case Activity Time": caseActTimeVal,
       });
     }
 
@@ -1420,6 +1680,7 @@ var DataParser = (function () {
     normalizeRowStatuses,
     normalizeDateStr,
     normalizeSoftwareName,
+    parseDateTimeAndShift,
     generateSampleData,
     STATUS_CANONICAL_MAP,
   };

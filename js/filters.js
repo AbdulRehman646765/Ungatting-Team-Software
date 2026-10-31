@@ -22,6 +22,8 @@ var FilterManager = (function () {
     brand: '',
     dateFrom: '',
     dateTo: '',
+    shiftWindow: '',
+    shiftDate: '',
     dynamic: {} // Key-value for additional detected columns
   };
 
@@ -74,14 +76,18 @@ var FilterManager = (function () {
       brand: '',
       dateFrom: '',
       dateTo: '',
+      shiftWindow: '',
+      shiftDate: '',
       dynamic: {}
     };
 
     // Reset DOM inputs
-    const inputs = document.querySelectorAll('.filter-input, .filter-select, #globalSearchInput');
-    inputs.forEach(input => {
-      input.value = '';
-    });
+    if (typeof document !== 'undefined') {
+      const inputs = document.querySelectorAll('.filter-input, .filter-select, #globalSearchInput');
+      inputs.forEach(input => {
+        input.value = '';
+      });
+    }
 
     renderActiveFilterTags();
     triggerChange();
@@ -308,6 +314,40 @@ var FilterManager = (function () {
       `;
     }
 
+    // 9b. Shift Tracking Filter (5:00 PM - 1:00 AM)
+    const hasShiftData = rows.some(r => r._isShift !== null && r._isShift !== undefined);
+    if (hasShiftData || detected.statusTimeCol || detected.caseActivityTimeCol) {
+      html += `
+        <div class="filter-group">
+          <label class="filter-label"><i class="fa-solid fa-business-time me-1"></i> Shift (5 PM - 1 AM)</label>
+          <select class="filter-select" id="filterShiftWindow" data-filter="shiftWindow">
+            <option value="">All Records (24 Hours)</option>
+            <option value="shift" ${currentFilters.shiftWindow === 'shift' ? 'selected' : ''}>🌙 Night Shift Only (5 PM - 1 AM)</option>
+            <option value="outside" ${currentFilters.shiftWindow === 'outside' ? 'selected' : ''}>☀️ Outside Shift Hours</option>
+          </select>
+        </div>
+      `;
+
+      // Collect all distinct Shift Dates
+      const shiftDateSet = new Set();
+      rows.forEach(r => {
+        if (r._shiftDate) shiftDateSet.add(r._shiftDate);
+      });
+
+      if (shiftDateSet.size > 0) {
+        const sortedShiftDates = Array.from(shiftDateSet).sort().reverse();
+        html += `
+          <div class="filter-group">
+            <label class="filter-label"><i class="fa-solid fa-moon me-1"></i> Shift Date</label>
+            <select class="filter-select" id="filterShiftDate" data-filter="shiftDate">
+              <option value="">All Shift Dates</option>
+              ${sortedShiftDates.map(d => `<option value="${escapeHtml(d)}" ${currentFilters.shiftDate === d ? 'selected' : ''}>Shift: ${escapeHtml(d)}</option>`).join('')}
+            </select>
+          </div>
+        `;
+      }
+    }
+
     // 10. Dynamic Filters for any other detected columns with manageable cardinality (e.g. 2 to 45 unique values)
     const statusCol = detected.statusCol;
     const standardCols = new Set([
@@ -325,7 +365,9 @@ var FilterManager = (function () {
       detected.asinCol,
       detected.skuCol,
       detected.caseIdCol,
-      detected.moreLessCol
+      detected.moreLessCol,
+      detected.statusTimeCol,
+      detected.caseActivityTimeCol
     ].filter(Boolean));
     
     headers.forEach(h => {
@@ -371,6 +413,7 @@ var FilterManager = (function () {
    * Render pill tags for any currently active filter
    */
   function renderActiveFilterTags() {
+    if (typeof document === 'undefined') return;
     const tagsContainer = document.getElementById('activeFilterTags');
     if (!tagsContainer) return;
 
@@ -414,6 +457,13 @@ var FilterManager = (function () {
     }
     if (currentFilters.dateTo) {
       tags.push({ key: 'dateTo', label: `To: ${currentFilters.dateTo}` });
+    }
+    if (currentFilters.shiftWindow) {
+      const shiftLabel = currentFilters.shiftWindow === 'shift' ? '🌙 Night Shift (5 PM - 1 AM)' : '☀️ Outside Shift';
+      tags.push({ key: 'shiftWindow', label: `Shift: ${shiftLabel}` });
+    }
+    if (currentFilters.shiftDate) {
+      tags.push({ key: 'shiftDate', label: `Shift Date: ${currentFilters.shiftDate}` });
     }
 
     Object.entries(currentFilters.dynamic).forEach(([col, val]) => {
@@ -477,6 +527,8 @@ var FilterManager = (function () {
     const brandVal = currentFilters.brand;
     const dateFromStr = currentFilters.dateFrom ? currentFilters.dateFrom.trim() : "";
     const dateToStr = currentFilters.dateTo ? currentFilters.dateTo.trim() : "";
+    const shiftWinVal = currentFilters.shiftWindow;
+    const shiftDateVal = currentFilters.shiftDate;
 
     const accCol = d.accountStatusCol;
     const caseLogCol = d.caseLogCol;
@@ -569,15 +621,27 @@ var FilterManager = (function () {
       }
 
       // 11. Date Range Filter
-      if ((dateFromStr || dateToStr) && dateCol) {
-        const rowDateVal = r[dateCol];
-        if (rowDateVal) {
-          const rowYmd = r._normalizedDate || (typeof DataParser !== 'undefined' ? DataParser.normalizeDateStr(rowDateVal) : rowDateVal);
-          if (rowYmd) {
-            if (dateFromStr && rowYmd < dateFromStr) return false;
-            if (dateToStr && rowYmd > dateToStr) return false;
-          }
+      if (dateFromStr || dateToStr) {
+        const rowDateVal = dateCol ? r[dateCol] : (r.Date || r.date || '');
+        const rowYmd = r._normalizedDate || (rowDateVal ? (typeof DataParser !== 'undefined' ? DataParser.normalizeDateStr(rowDateVal) : rowDateVal) : '');
+        if (rowYmd) {
+          if (dateFromStr && rowYmd < dateFromStr) return false;
+          if (dateToStr && rowYmd > dateToStr) return false;
+        } else {
+          return false;
         }
+      }
+
+      // 11b. Shift Window Filter (5:00 PM - 1:00 AM)
+      if (shiftWinVal === 'shift') {
+        if (r._isShift !== true) return false;
+      } else if (shiftWinVal === 'outside') {
+        if (r._isShift !== false) return false;
+      }
+
+      // 11c. Shift Date Filter
+      if (shiftDateVal) {
+        if (r._shiftDate !== shiftDateVal) return false;
       }
 
       // 12. Global Search Query across all fields

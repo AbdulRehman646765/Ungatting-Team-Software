@@ -900,7 +900,12 @@ var App = (function () {
         const val = r[h] !== undefined ? r[h] : '';
         const lowerH = h.toLowerCase();
 
-        if (h === statusCol || /status|log|case re-?open/i.test(lowerH)) {
+        if (/time|timestamp/i.test(lowerH) || h === state.dataset.detectedColumns.statusTimeCol || h === state.dataset.detectedColumns.caseActivityTimeCol) {
+          const timeBadge = val
+            ? `<span class="badge-timestamp"><i class="fa-regular fa-clock me-1"></i>${escapeHtml(val)}</span>`
+            : '<span style="color:var(--text-dim);">—</span>';
+          tbodyHtml += `<td>${timeBadge}</td>`;
+        } else if (h === statusCol || /status|log|case re-?open/i.test(lowerH)) {
           const badgeClass = getStatusBadgeClass(val);
           tbodyHtml += `<td><span class="badge-status ${badgeClass}"><i class="fa-solid fa-circle" style="font-size: 6px;"></i> ${escapeHtml(val)}</span></td>`;
         } else if (/date/i.test(lowerH)) {
@@ -1067,6 +1072,7 @@ var App = (function () {
     if (!select || !state.dataset) return;
 
     let html = `<option value="">-- Choose Any Detected Column --</option>`;
+    html += `<option value="Shift Date">🌙 Shift Date (5 PM - 1 AM)</option>`;
     state.dataset.headers.forEach(h => {
       html += `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`;
     });
@@ -1098,14 +1104,16 @@ var App = (function () {
     else if (targetDim === 'Date' && detected.dateCol) actualCol = detected.dateCol;
     else if (targetDim === 'ASIN' && detected.asinCol) actualCol = detected.asinCol;
     else if (targetDim === 'Software' && detected.softwareCol) actualCol = detected.softwareCol;
+    else if (targetDim === 'Shift Date') actualCol = '_shiftDate';
 
     // Check if column exists
-    if (!state.dataset.headers.includes(actualCol)) {
+    if (!state.dataset.headers.includes(actualCol) && !actualCol.startsWith('_')) {
       actualCol = state.dataset.headers[0];
     }
 
     if (dimTitle) {
-      dimTitle.innerText = `Grouped Breakdown by: ${actualCol}`;
+      const displayColName = actualCol === '_shiftDate' ? 'Shift Date (5 PM - 1 AM)' : actualCol;
+      dimTitle.innerText = `Grouped Breakdown by: ${displayColName}`;
     }
 
     const rows = state.filteredRows;

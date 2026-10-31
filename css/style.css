@@ -1555,6 +1555,28 @@ button, input, select, textarea {
   border: none !important;
 }
 
+/* Timestamp badge for Status Time & Case Activity Time */
+.badge-timestamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.22rem 0.55rem;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.badge-timestamp i {
+  color: var(--primary);
+  font-size: 0.74rem;
+  opacity: 0.85;
+}
+
 /* Software Hub Styles */
 .software-hub-container {
   display: flex;
