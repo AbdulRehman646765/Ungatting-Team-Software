@@ -26,7 +26,13 @@ var DataExporter = (function () {
     const cleanData = data.map(row => {
       const cleanRow = {};
       headers.forEach(h => {
-        cleanRow[h] = row[h] !== undefined ? row[h] : '';
+        let cellVal = row[h] !== undefined ? row[h] : '';
+        if (/date/i.test(h) && typeof cellVal === 'string' && cellVal) {
+          if (typeof DataParser !== 'undefined' && DataParser.formatDateDDMMYYYY) {
+            cellVal = DataParser.formatDateDDMMYYYY(cellVal);
+          }
+        }
+        cleanRow[h] = cellVal;
       });
       return cleanRow;
     });
@@ -83,7 +89,10 @@ var DataExporter = (function () {
     // Row lines
     data.forEach(row => {
       const line = headers.map(h => {
-        const cell = row[h] !== undefined && row[h] !== null ? row[h].toString() : '';
+        let cell = row[h] !== undefined && row[h] !== null ? row[h].toString() : '';
+        if (/date/i.test(h) && cell && typeof DataParser !== 'undefined' && DataParser.formatDateDDMMYYYY) {
+          cell = DataParser.formatDateDDMMYYYY(cell);
+        }
         return `"${cell.replace(/"/g, '""')}"`;
       }).join(',');
       csvContent += line + '\r\n';
@@ -135,7 +144,13 @@ var DataExporter = (function () {
     // Filter headers to most essential 8 columns for PDF width if wide
     const displayHeaders = headers.length > 8 ? headers.slice(0, 8) : headers;
 
-    const tableRows = data.map(r => displayHeaders.map(h => (r[h] !== undefined ? r[h].toString() : '')));
+    const tableRows = data.map(r => displayHeaders.map(h => {
+      let cell = r[h] !== undefined ? r[h].toString() : '';
+      if (/date/i.test(h) && cell && typeof DataParser !== 'undefined' && DataParser.formatDateDDMMYYYY) {
+        cell = DataParser.formatDateDDMMYYYY(cell);
+      }
+      return cell;
+    }));
 
     // Use autoTable if available
     if (doc.autoTable) {

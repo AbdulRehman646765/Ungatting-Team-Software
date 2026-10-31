@@ -114,48 +114,59 @@ var App = (function () {
     }
   }
 
-  /* ==========================================================================
-     Sidebar & Navigation
-     ========================================================================== */
-  function initNavigation() {
-    const navItems = document.querySelectorAll('.sidebar-nav .nav-item[data-view]');
-    navItems.forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.preventDefault();
-        const targetView = item.getAttribute('data-view');
-        switchView(targetView);
-      });
+/* ==========================================================================
+   Sidebar & Navigation
+   ========================================================================== */
+function initNavigation() {
+  const navItems = document.querySelectorAll('.sidebar-nav .nav-item[data-view]');
+
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetView = item.getAttribute('data-view');
+      switchView(targetView);
     });
+  });
 
-    // Sidebar collapse toggle
-    const toggleBtn = document.getElementById('sidebarToggleBtn');
-    const sidebar = document.getElementById('appSidebar');
-    if (toggleBtn && sidebar) {
-      toggleBtn.addEventListener('click', () => {
-        sidebar.classList.toggle('collapsed');
-      });
-    }
+  // Sidebar collapse toggle
+  const toggleBtn = document.getElementById('sidebarToggleBtn');
+  const sidebar = document.getElementById('appSidebar');
 
-    // Mobile menu toggle
-    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-    if (mobileMenuBtn && sidebar) {
-      mobileMenuBtn.addEventListener('click', () => {
-        sidebar.classList.toggle('mobile-open');
-      });
-    }
-
-    // Global search in header
-    const globalSearchInput = document.getElementById('globalSearchInput');
-    if (globalSearchInput) {
-      let debounceTimeout;
-      globalSearchInput.addEventListener('input', (e) => {
-        clearTimeout(debounceTimeout);
-        debounceTimeout = setTimeout(() => {
-          FilterManager.setFilter('search', e.target.value);
-        }, 250);
-      });
-    }
+  // Sidebar closed by default
+  if (sidebar) {
+    sidebar.classList.add('collapsed');
   }
+
+  if (toggleBtn && sidebar) {
+    toggleBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+    });
+  }
+
+  // Mobile menu toggle
+  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+
+  if (mobileMenuBtn && sidebar) {
+    mobileMenuBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('mobile-open');
+    });
+  }
+
+  // Global search in header
+  const globalSearchInput = document.getElementById('globalSearchInput');
+
+  if (globalSearchInput) {
+    let debounceTimeout;
+
+    globalSearchInput.addEventListener('input', (e) => {
+      clearTimeout(debounceTimeout);
+
+      debounceTimeout = setTimeout(() => {
+        FilterManager.setFilter('search', e.target.value);
+      }, 250);
+    });
+  }
+}
 
   function switchView(viewName) {
     state.currentView = viewName;
@@ -519,6 +530,7 @@ var App = (function () {
         updateDatasetBadge(state.dataset.totalRows, state.dataset.totalColumns);
         refreshDashboardViews();
         renderTable();
+        populateTableToolbarDropdowns();
         setupReportDimensionDropdown();
         renderReportBreakdown();
 
@@ -636,6 +648,16 @@ var App = (function () {
     const tableHead = document.getElementById('dataTableHead');
     const tableBody = document.getElementById('dataTableBody');
     const paginationContainer = document.getElementById('tablePaginationContainer');
+    const compSelect = document.getElementById('tableFilterCompany');
+    if (compSelect) compSelect.innerHTML = '<option value="">🏢 All Companies</option>';
+    const catSelect = document.getElementById('tableFilterCategory');
+    if (catSelect) catSelect.innerHTML = '<option value="">🏷️ All Categories</option>';
+    const supSelect = document.getElementById('tableFilterSupplier');
+    if (supSelect) supSelect.innerHTML = '<option value="">📦 All Suppliers</option>';
+    const statSelect = document.getElementById('tableFilterStatus');
+    if (statSelect) statSelect.innerHTML = '<option value="">🚦 All Statuses</option>';
+    const banner = document.getElementById('tableActiveFilterSummary');
+    if (banner) banner.style.display = 'none';
     if (tableHead) tableHead.innerHTML = '';
     if (tableBody) {
       tableBody.innerHTML = `
@@ -760,6 +782,7 @@ var App = (function () {
 
     refreshDashboardViews();
     renderTable();
+    updateTableActiveFilterBanner();
     renderReportBreakdown();
   }
 
@@ -814,6 +837,337 @@ var App = (function () {
           FilterManager.setFilter('search', e.target.value);
         }, 200);
       });
+    }
+
+    // Table Toolbar Quick Filter: Company
+    const compSelect = document.getElementById('tableFilterCompany');
+    if (compSelect) {
+      compSelect.addEventListener('change', (e) => {
+        const compVal = e.target.value;
+        FilterManager.setFilter('company', compVal);
+        updateTableCategoryOptions(compVal);
+        updateTableActiveFilterBanner();
+      });
+    }
+
+    // Table Toolbar Quick Filter: Category
+    const catSelect = document.getElementById('tableFilterCategory');
+    if (catSelect) {
+      catSelect.addEventListener('change', (e) => {
+        FilterManager.setFilter('category', e.target.value);
+        updateTableActiveFilterBanner();
+      });
+    }
+
+    // Table Toolbar Quick Filter: Supplier
+    const supSelect = document.getElementById('tableFilterSupplier');
+    if (supSelect) {
+      supSelect.addEventListener('change', (e) => {
+        FilterManager.setFilter('supplier', e.target.value);
+        updateTableActiveFilterBanner();
+      });
+    }
+
+    // Table Toolbar Quick Filter: Status
+    const statusSelect = document.getElementById('tableFilterStatus');
+    if (statusSelect) {
+      statusSelect.addEventListener('change', (e) => {
+        FilterManager.setFilter('accountStatus', e.target.value);
+        updateTableActiveFilterBanner();
+      });
+    }
+
+    // Reset Table Filters Button
+    const btnReset = document.getElementById('btnResetTableFilters');
+    const btnClearBanner = document.getElementById('btnClearTableActiveFilter');
+    const handleReset = () => {
+      if (compSelect) compSelect.value = '';
+      if (catSelect) catSelect.value = '';
+      if (supSelect) supSelect.value = '';
+      if (statusSelect) statusSelect.value = '';
+      if (tableSearchInput) tableSearchInput.value = '';
+      FilterManager.resetFilters();
+      if (state.dataset) populateTableToolbarDropdowns();
+      showToast('🔄 Table filters reset to show all records.', 'info');
+    };
+    if (btnReset) btnReset.addEventListener('click', handleReset);
+    if (btnClearBanner) btnClearBanner.addEventListener('click', handleReset);
+
+    // Export Report Button (Primary Excel export)
+    const btnExportReport = document.getElementById('btnExportTableReport');
+    if (btnExportReport) {
+      btnExportReport.addEventListener('click', () => {
+        exportCurrentTableReport('excel');
+      });
+    }
+
+    // Export Dropdown Menu Toggle
+    const btnDropdownToggle = document.getElementById('btnExportTableDropdownToggle');
+    const dropdownMenu = document.getElementById('tableExportDropdownMenu');
+    if (btnDropdownToggle && dropdownMenu) {
+      btnDropdownToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdownMenu.classList.toggle('show');
+      });
+      document.addEventListener('click', () => {
+        dropdownMenu.classList.remove('show');
+      });
+    }
+
+    // Export format buttons inside dropdown
+    const btnExcel = document.getElementById('btnExportTableExcel');
+    if (btnExcel) {
+      btnExcel.addEventListener('click', () => {
+        if (dropdownMenu) dropdownMenu.classList.remove('show');
+        exportCurrentTableReport('excel');
+      });
+    }
+    const btnPdf = document.getElementById('btnExportTablePDF');
+    if (btnPdf) {
+      btnPdf.addEventListener('click', () => {
+        if (dropdownMenu) dropdownMenu.classList.remove('show');
+        exportCurrentTableReport('pdf');
+      });
+    }
+    const btnCsv = document.getElementById('btnExportTableCSV');
+    if (btnCsv) {
+      btnCsv.addEventListener('click', () => {
+        if (dropdownMenu) dropdownMenu.classList.remove('show');
+        exportCurrentTableReport('csv');
+      });
+    }
+    const btnJson = document.getElementById('btnExportTableJSON');
+    if (btnJson) {
+      btnJson.addEventListener('click', () => {
+        if (dropdownMenu) dropdownMenu.classList.remove('show');
+        exportCurrentTableReport('json');
+      });
+    }
+  }
+
+  /**
+   * Populate the quick-filter dropdowns in the Data Records Table toolbar
+   * (Company, Category, Supplier, Status).
+   */
+  function populateTableToolbarDropdowns() {
+    if (!state.dataset || !state.dataset.rows) return;
+    const rows = state.dataset.rows;
+    const detected = state.dataset.detectedColumns;
+    const compCol = detected.companyCol;
+    const catCol = detected.categoryCol;
+    const supCol = detected.supplierCol;
+    const statusCol = detected.accountStatusCol || detected.statusCol;
+
+    const compSelect = document.getElementById('tableFilterCompany');
+    const catSelect = document.getElementById('tableFilterCategory');
+    const supSelect = document.getElementById('tableFilterSupplier');
+    const statusSelect = document.getElementById('tableFilterStatus');
+
+    // 1. Populate Companies with counts
+    if (compSelect && compCol) {
+      const compCounts = {};
+      rows.forEach(r => {
+        const val = (r[compCol] || '').toString().trim();
+        if (val) compCounts[val] = (compCounts[val] || 0) + 1;
+      });
+      const sortedComps = Object.keys(compCounts).sort((a, b) => a.localeCompare(b));
+      const currentVal = compSelect.value || FilterManager.getCurrentFilters().company || '';
+
+      let compHtml = `<option value="">🏢 All Companies (${sortedComps.length})</option>`;
+      sortedComps.forEach(comp => {
+        const selected = comp === currentVal ? 'selected' : '';
+        compHtml += `<option value="${escapeHtml(comp)}" ${selected}>${escapeHtml(comp)} (${compCounts[comp]})</option>`;
+      });
+      compSelect.innerHTML = compHtml;
+    }
+
+    // 2. Populate Categories (cascades if company is selected)
+    updateTableCategoryOptions(compSelect ? compSelect.value : '');
+
+    // 3. Populate Suppliers with counts
+    if (supSelect && supCol) {
+      const supCounts = {};
+      rows.forEach(r => {
+        const val = (r[supCol] || '').toString().trim();
+        if (val) supCounts[val] = (supCounts[val] || 0) + 1;
+      });
+      const sortedSups = Object.keys(supCounts).sort((a, b) => a.localeCompare(b));
+      const currentVal = supSelect.value || FilterManager.getCurrentFilters().supplier || '';
+
+      let supHtml = `<option value="">📦 All Suppliers (${sortedSups.length})</option>`;
+      sortedSups.forEach(sup => {
+        const selected = sup === currentVal ? 'selected' : '';
+        supHtml += `<option value="${escapeHtml(sup)}" ${selected}>${escapeHtml(sup)} (${supCounts[sup]})</option>`;
+      });
+      supSelect.innerHTML = supHtml;
+    }
+
+    // 4. Populate Statuses with counts
+    if (statusSelect) {
+      const statusCounts = {};
+      rows.forEach(r => {
+        const val = (r._canonicalAccountStatus || (statusCol && r[statusCol]) || '').toString().trim();
+        if (val) statusCounts[val] = (statusCounts[val] || 0) + 1;
+      });
+      const sortedStatuses = Object.keys(statusCounts).sort((a, b) => a.localeCompare(b));
+      const currentVal = statusSelect.value || FilterManager.getCurrentFilters().accountStatus || '';
+
+      let statusHtml = `<option value="">🚦 All Statuses</option>`;
+      sortedStatuses.forEach(st => {
+        const selected = st.toLowerCase() === currentVal.toLowerCase() ? 'selected' : '';
+        statusHtml += `<option value="${escapeHtml(st)}" ${selected}>${escapeHtml(st)} (${statusCounts[st]})</option>`;
+      });
+      statusSelect.innerHTML = statusHtml;
+    }
+
+    updateTableActiveFilterBanner();
+  }
+
+  /**
+   * Dynamically populate/cascade the Category dropdown based on selected company
+   */
+  function updateTableCategoryOptions(selectedCompany) {
+    const catSelect = document.getElementById('tableFilterCategory');
+    if (!catSelect || !state.dataset) return;
+    const rows = state.dataset.rows;
+    const detected = state.dataset.detectedColumns;
+    const compCol = detected.companyCol;
+    const catCol = detected.categoryCol;
+    if (!catCol) return;
+
+    const catCounts = {};
+    rows.forEach(r => {
+      // If company is selected, count only categories for this company
+      if (selectedCompany && compCol) {
+        const rowComp = (r[compCol] || '').toString().trim();
+        if (rowComp !== selectedCompany) return;
+      }
+      const cat = (r[catCol] || '').toString().trim();
+      if (cat) catCounts[cat] = (catCounts[cat] || 0) + 1;
+    });
+
+    const sortedCats = Object.keys(catCounts).sort((a, b) => a.localeCompare(b));
+    const currentVal = catSelect.value || FilterManager.getCurrentFilters().category || '';
+
+    const labelPrefix = selectedCompany ? `🏷️ All Categories for ${selectedCompany}` : `🏷️ All Categories (${sortedCats.length})`;
+    let catHtml = `<option value="">${escapeHtml(labelPrefix)}</option>`;
+
+    sortedCats.forEach(cat => {
+      const selected = cat === currentVal ? 'selected' : '';
+      catHtml += `<option value="${escapeHtml(cat)}" ${selected}>${escapeHtml(cat)} (${catCounts[cat]})</option>`;
+    });
+    catSelect.innerHTML = catHtml;
+  }
+
+  /**
+   * Update the active filter summary banner above the Data Records Table
+   */
+  function updateTableActiveFilterBanner() {
+    const banner = document.getElementById('tableActiveFilterSummary');
+    const textEl = document.getElementById('tableActiveFilterText');
+    if (!banner || !textEl || !state.dataset) return;
+
+    const filters = FilterManager.getCurrentFilters();
+    const activeParts = [];
+
+    if (filters.company) activeParts.push(`<strong>Company:</strong> <span class="badge-status badge-approved" style="font-size:0.78rem;">${escapeHtml(filters.company)}</span>`);
+    if (filters.category) activeParts.push(`<strong>Category:</strong> <span class="badge-status badge-review" style="font-size:0.78rem;">${escapeHtml(filters.category)}</span>`);
+    if (filters.supplier) activeParts.push(`<strong>Supplier:</strong> <span class="badge-status badge-copylist" style="font-size:0.78rem;">${escapeHtml(filters.supplier)}</span>`);
+    if (filters.accountStatus) activeParts.push(`<strong>Status:</strong> <span class="badge-status badge-gated" style="font-size:0.78rem;">${escapeHtml(filters.accountStatus)}</span>`);
+    if (filters.search) activeParts.push(`<strong>Search:</strong> "${escapeHtml(filters.search)}"`);
+
+    if (activeParts.length > 0) {
+      banner.style.display = 'flex';
+      textEl.innerHTML = `<i class="fa-solid fa-filter me-2 text-primary"></i> Filtered by: ${activeParts.join(' &nbsp;|&nbsp; ')} &nbsp;—&nbsp; <strong>${formatNumber(state.filteredRows.length)}</strong> records match`;
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
+  /**
+   * Export the currently viewed/filtered records from the Data Records Table.
+   * Supports intelligent naming for:
+   *  - Single Company (e.g. Amazon_Ungating_ClickToTheCart_Global_Inc_Report.xlsx)
+   *  - Company + Category (e.g. Amazon_Ungating_ClickToTheCart_Global_Inc_Beauty_and_Personal_Care_Report.xlsx)
+   *  - Single Category (e.g. Amazon_Ungating_Category_Beauty_and_Personal_Care_Report.xlsx)
+   *  - Single Supplier (e.g. Amazon_Ungating_Supplier_DEBROX_Report.xlsx)
+   *  - All Records (e.g. Amazon_Ungating_Data_Records_Report.xlsx)
+   */
+  function exportCurrentTableReport(format = 'excel') {
+    if (!state.dataset || !state.filteredRows || state.filteredRows.length === 0) {
+      showToast('⚠️ No records available to export for the current table view.', 'warning');
+      return;
+    }
+
+    const filters = FilterManager.getCurrentFilters();
+    const comp = (filters.company || '').trim();
+    const cat = (filters.category || '').trim();
+    const sup = (filters.supplier || '').trim();
+    const stat = (filters.accountStatus || '').trim();
+
+    const sanitize = (s) => s.replace(/[^A-Za-z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+
+    let baseName = 'Amazon_Ungating';
+    let filterDescription = '';
+
+    if (comp && cat) {
+      baseName += `_${sanitize(comp)}_${sanitize(cat)}`;
+      filterDescription = `${comp} (${cat})`;
+    } else if (comp) {
+      baseName += `_${sanitize(comp)}`;
+      filterDescription = `Company: ${comp}`;
+    } else if (cat) {
+      baseName += `_Category_${sanitize(cat)}`;
+      filterDescription = `Category: ${cat}`;
+    } else if (sup) {
+      baseName += `_Supplier_${sanitize(sup)}`;
+      filterDescription = `Supplier: ${sup}`;
+    } else if (stat) {
+      baseName += `_Status_${sanitize(stat)}`;
+      filterDescription = `Status: ${stat}`;
+    } else {
+      baseName += '_Data_Records';
+      filterDescription = 'All Filtered Records';
+    }
+
+    baseName += '_Report';
+
+    const count = state.filteredRows.length;
+    const headers = state.dataset.headers;
+
+    if (format === 'excel') {
+      DataExporter.exportToExcel(state.filteredRows, headers, `${baseName}.xlsx`);
+      showToast(`📗 Exported ${formatNumber(count)} records for ${filterDescription} to Excel!`, 'success');
+    } else if (format === 'pdf') {
+      const pdfTitle = `Amazon Ungating Report — ${filterDescription}`;
+      DataExporter.exportToPDF(state.filteredRows, headers, pdfTitle);
+      showToast(`📕 Exported ${formatNumber(count)} records for ${filterDescription} to PDF!`, 'success');
+    } else if (format === 'csv') {
+      DataExporter.exportToCSV(state.filteredRows, headers, `${baseName}.csv`);
+      showToast(`📄 Exported ${formatNumber(count)} records for ${filterDescription} to CSV!`, 'success');
+    } else if (format === 'json') {
+      // JSON export
+      const jsonStr = JSON.stringify(state.filteredRows.map(r => {
+        const clean = {};
+        headers.forEach(h => {
+          let val = r[h] !== undefined ? r[h] : '';
+          if (/date/i.test(h) && val && typeof DataParser !== 'undefined') {
+            val = DataParser.formatDateDDMMYYYY(val);
+          }
+          clean[h] = val;
+        });
+        return clean;
+      }), null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${baseName}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`📋 Exported ${formatNumber(count)} records for ${filterDescription} to JSON!`, 'success');
     }
   }
 
@@ -909,7 +1263,10 @@ var App = (function () {
           const badgeClass = getStatusBadgeClass(val);
           tbodyHtml += `<td><span class="badge-status ${badgeClass}"><i class="fa-solid fa-circle" style="font-size: 6px;"></i> ${escapeHtml(val)}</span></td>`;
         } else if (/date/i.test(lowerH)) {
-          tbodyHtml += `<td style="font-family: monospace;">${escapeHtml(val)}</td>`;
+          const dVal = (typeof DataParser !== 'undefined' && DataParser.formatDateDDMMYYYY)
+            ? DataParser.formatDateDDMMYYYY(val)
+            : val;
+          tbodyHtml += `<td style="font-family: monospace; text-align: center;">${escapeHtml(dVal || val)}</td>`;
         } else if (/asin/i.test(lowerH)) {
           const sw = r._software || '';
           const swCls = getSoftwareCssClass(sw);
@@ -1145,6 +1502,11 @@ var App = (function () {
 
     rows.forEach(r => {
       let key = (r[actualCol] || 'Unassigned').toString().trim();
+      if (/date/i.test(actualCol) || actualCol === '_shiftDate') {
+        if (typeof DataParser !== 'undefined' && DataParser.formatDateDDMMYYYY && key !== 'Unassigned') {
+          key = DataParser.formatDateDDMMYYYY(key);
+        }
+      }
       if (!groups[key]) {
         const entry = { dimension: key, total: 0 };
         ALL_STATUS_COLS.forEach(col => { entry[col.key] = 0; });

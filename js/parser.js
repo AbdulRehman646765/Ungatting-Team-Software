@@ -304,6 +304,65 @@ var DataParser = (function () {
   };
 
   /**
+   * Format any date string or Date object to standard DD-MM-YYYY format (e.g. 29-09-2026)
+   */
+  function formatDateDDMMYYYY(val) {
+    if (!val) return "";
+    if (val instanceof Date) {
+      if (isNaN(val.getTime())) return "";
+      const d = String(val.getDate()).padStart(2, "0");
+      const m = String(val.getMonth() + 1).padStart(2, "0");
+      const y = val.getFullYear();
+      return `${d}-${m}-${y}`;
+    }
+    const s = String(val).trim();
+    if (!s) return "";
+
+    // If string has date + optional time (e.g., "2026-10-31 05:32 PM" or "28-09-2026 18:30")
+    const dateMatch = s.match(/^(\d{1,4})[-/.](\d{1,2})[-/.](\d{1,4})/);
+    if (dateMatch) {
+      const p1 = parseInt(dateMatch[1], 10);
+      const p2 = parseInt(dateMatch[2], 10);
+      const p3 = parseInt(dateMatch[3], 10);
+
+      // Case 1: YYYY-MM-DD or YYYY/MM/DD
+      if (p1 > 1000) {
+        const y = p1;
+        const m = String(p2).padStart(2, "0");
+        const d = String(p3).padStart(2, "0");
+        return `${d}-${m}-${y}`;
+      }
+
+      // Case 2: Year is p3 (e.g. DD-MM-YYYY or MM-DD-YYYY)
+      let y = p3;
+      if (y < 100) y += 2000;
+
+      // If p1 > 12, p1 MUST be day: DD-MM-YYYY (e.g. 28-09-2026 -> 28-09-2026)
+      if (p1 > 12) {
+        return `${String(p1).padStart(2, "0")}-${String(p2).padStart(2, "0")}-${y}`;
+      }
+      // If p2 > 12, p2 MUST be day: MM-DD-YYYY (e.g. 09-28-2026 -> 28-09-2026)
+      if (p2 > 12) {
+        return `${String(p2).padStart(2, "0")}-${String(p1).padStart(2, "0")}-${y}`;
+      }
+      // Ambiguous (both <= 12, e.g. 10-01-2026): Default to DD-MM-YYYY
+      return `${String(p1).padStart(2, "0")}-${String(p2).padStart(2, "0")}-${y}`;
+    }
+
+    // Fallback: Date.parse
+    const ts = Date.parse(s);
+    if (!isNaN(ts)) {
+      const dt = new Date(ts);
+      const d = String(dt.getDate()).padStart(2, "0");
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const y = dt.getFullYear();
+      return `${d}-${m}-${y}`;
+    }
+
+    return s;
+  }
+
+  /**
    * Normalize date string to standard YYYY-MM-DD format
    * Correctly handles DD-MM-YYYY, MM-DD-YYYY, and YYYY-MM-DD without month/day confusion
    */
@@ -972,9 +1031,9 @@ var DataParser = (function () {
       const rowObj = { _id: i + 1 };
       headers.forEach((h, colIdx) => {
         let val = rowArr[colIdx] !== undefined ? rowArr[colIdx].trim() : "";
-        // Normalize date fields
+        // Normalize date fields to standard DD-MM-YYYY format (e.g. 29-09-2026)
         if (/date/i.test(h) || /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(val)) {
-          val = normalizeDateStr(val);
+          val = formatDateDDMMYYYY(val);
         }
         rowObj[h] = val;
       });
@@ -1479,7 +1538,12 @@ var DataParser = (function () {
 
       const rawDate = dateKey ? (r[dateKey] || "").toString().trim() : "";
       const normDate = normalizeDateStr(rawDate);
-      r._normalizedDate = normDate;
+      const dispDate = formatDateDDMMYYYY(rawDate);
+      r._normalizedDate = normDate; // YYYY-MM-DD for accurate date range filtering
+      r._displayDate = dispDate;    // DD-MM-YYYY (e.g. 29-09-2026)
+      if (dateKey && dispDate) {
+        r[dateKey] = dispDate;
+      }
       r._canonicalAccountStatus = accCan;
       r._canonicalCaseLog = logCan;
       r._canonicalCaseStatus = caseCan;
@@ -1499,11 +1563,11 @@ var DataParser = (function () {
       if (activeShiftInfo) {
         r._isShift = activeShiftInfo.isShift;
         r._shiftWindow = activeShiftInfo.shiftWindow;
-        r._shiftDate = activeShiftInfo.shiftDate;
+        r._shiftDate = formatDateDDMMYYYY(activeShiftInfo.shiftDate);
       } else {
         r._isShift = null;
         r._shiftWindow = "Standard";
-        r._shiftDate = normDate;
+        r._shiftDate = dispDate || formatDateDDMMYYYY(normDate);
       }
     });
   }
@@ -1595,10 +1659,13 @@ var DataParser = (function () {
           .toUpperCase() || "CAT";
       const sku = `${safeBrand}-${safeCat}-${1000 + i}`;
 
-      // Date within past 90 days
+      // Date within past 90 days in standard DD-MM-YYYY format (e.g. 29-09-2026)
       const pastDays = Math.floor(Math.random() * 90);
       const d = new Date(now.getTime() - pastDays * 24 * 60 * 60 * 1000);
-      const dateStr = d.toISOString().split("T")[0];
+      const dayStr = String(d.getDate()).padStart(2, "0");
+      const monStr = String(d.getMonth() + 1).padStart(2, "0");
+      const yrStr = d.getFullYear();
+      const dateStr = `${dayStr}-${monStr}-${yrStr}`;
 
       const caseId = `223${Math.floor(10000000 + Math.random() * 90000000)}`;
       const units = [50, 100, 200, 50, 100][i % 5];
@@ -1679,6 +1746,7 @@ var DataParser = (function () {
     inferColumnRoles,
     normalizeRowStatuses,
     normalizeDateStr,
+    formatDateDDMMYYYY,
     normalizeSoftwareName,
     parseDateTimeAndShift,
     generateSampleData,

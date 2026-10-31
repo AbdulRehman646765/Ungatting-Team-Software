@@ -182,41 +182,6 @@ var FilterManager = (function () {
       `;
     }
 
-    // 4. Quantity / Qty Filter (numerical values sorted ascending)
-    const unitsCol = detected.unitsCol;
-    if (unitsCol && distinctValues[unitsCol] && distinctValues[unitsCol].size > 0) {
-      const qtyOptions = Array.from(distinctValues[unitsCol]).sort((a, b) => {
-        const numA = parseFloat(a);
-        const numB = parseFloat(b);
-        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-        return a.localeCompare(b, undefined, { numeric: true });
-      });
-      html += `
-        <div class="filter-group">
-          <label class="filter-label"><i class="fa-solid fa-boxes-stacked me-1"></i> ${escapeHtml(unitsCol || 'Quantity')}</label>
-          <select class="filter-select" id="filterQty" data-filter="qty">
-            <option value="">All Quantities</option>
-            ${qtyOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.qty === opt ? 'selected' : ''}>${escapeHtml(opt)} Units</option>`).join('')}
-          </select>
-        </div>
-      `;
-    }
-
-    // 5. Software Filter (e.g. Orbit-N, Orbit-B, Orbit-A, Aura, Shipment)
-    const softCol = detected.softwareCol;
-    if (softCol && distinctValues[softCol] && distinctValues[softCol].size > 0) {
-      const softOptions = Array.from(distinctValues[softCol]).sort();
-      html += `
-        <div class="filter-group">
-          <label class="filter-label"><i class="fa-solid fa-laptop-code me-1"></i> ${escapeHtml(softCol || 'Software')}</label>
-          <select class="filter-select" id="filterSoftware" data-filter="software">
-            <option value="">All Softwares</option>
-            ${softOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.software === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
-          </select>
-        </div>
-      `;
-    }
-
     // Generic Status Filter (if none of the specific 3 status columns exist)
     if (!accCol && !caseLogCol && !caseStatusCol) {
       const allStatusesSet = new Set();
@@ -298,6 +263,42 @@ var FilterManager = (function () {
         </div>
       `;
     }
+
+    // 4. Quantity / Qty Filter (numerical values sorted ascending)
+    const unitsCol = detected.unitsCol;
+    if (unitsCol && distinctValues[unitsCol] && distinctValues[unitsCol].size > 0) {
+      const qtyOptions = Array.from(distinctValues[unitsCol]).sort((a, b) => {
+        const numA = parseFloat(a);
+        const numB = parseFloat(b);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.localeCompare(b, undefined, { numeric: true });
+      });
+      html += `
+        <div class="filter-group">
+          <label class="filter-label"><i class="fa-solid fa-boxes-stacked me-1"></i> ${escapeHtml(unitsCol || 'Quantity')}</label>
+          <select class="filter-select" id="filterQty" data-filter="qty">
+            <option value="">All Quantities</option>
+            ${qtyOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.qty === opt ? 'selected' : ''}>${escapeHtml(opt)} Units</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+
+    // 5. Software Filter (e.g. Orbit-N, Orbit-B, Orbit-A, Aura, Shipment)
+    const softCol = detected.softwareCol;
+    if (softCol && distinctValues[softCol] && distinctValues[softCol].size > 0) {
+      const softOptions = Array.from(distinctValues[softCol]).sort();
+      html += `
+        <div class="filter-group">
+          <label class="filter-label"><i class="fa-solid fa-laptop-code me-1"></i> ${escapeHtml(softCol || 'Software')}</label>
+          <select class="filter-select" id="filterSoftware" data-filter="software">
+            <option value="">All Softwares</option>
+            ${softOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentFilters.software === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+
 
     // 9. Date Range Filters (if date column exists)
     const dateCol = detected.dateCol;
@@ -668,6 +669,7 @@ var FilterManager = (function () {
 
   return {
     getFilterState,
+    getCurrentFilters: getFilterState,
     setFilter,
     resetFilters,
     buildFilterUI,

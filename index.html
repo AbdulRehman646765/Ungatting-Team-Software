@@ -97,8 +97,16 @@
                 <a href="" target="_blank" rel="noopener" title="GitHub">
                   <i class="fa-brands fa-github"></i>
                 </a>
-                <a href="" target="_blank" rel="noopener" title="LinkedIn">
+                <a
+                  href="https://www.linkedin.com/in/abdul-rehman-73a769220/"
+                  target="_blank"
+                  rel="noopener"
+                  title="LinkedIn"
+                >
                   <i class="fa-brands fa-linkedin"></i>
+                </a>
+                <a href="mailto:abdulofficial187@gmail.com" title="Email">
+                  <i class="fa-solid fa-envelope"></i>
                 </a>
               </div>
             </div>
@@ -207,11 +215,17 @@
                   "
                 ></div>
                 <button class="dropdown-item" id="btnExportUngatedExcel">
-                  <i class="fa-solid fa-circle-check" style="color: #059669"></i>
+                  <i
+                    class="fa-solid fa-circle-check"
+                    style="color: #059669"
+                  ></i>
                   Export Ungated Only (.xlsx)
                 </button>
                 <button class="dropdown-item" id="btnExportGatedExcel">
-                  <i class="fa-solid fa-circle-xmark" style="color: #dc2626"></i>
+                  <i
+                    class="fa-solid fa-circle-xmark"
+                    style="color: #dc2626"
+                  ></i>
                   Export Gated / Review (.xlsx)
                 </button>
                 <div
@@ -232,7 +246,12 @@
                   Copy ClickUp Report
                 </button>
               </div>
-              <input type="file" id="jsonFileInput" accept=".json,application/json" style="display: none;" />
+              <input
+                type="file"
+                id="jsonFileInput"
+                accept=".json,application/json"
+                style="display: none"
+              />
             </div>
 
             <!-- Theme Toggle Button -->
@@ -383,7 +402,9 @@
                       <i class="fa-solid fa-laptop-code"></i>
                     </div>
                     <div>
-                      <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0">
+                      <h3
+                        style="font-size: 1.15rem; font-weight: 700; margin: 0"
+                      >
                         Software ASIN Tracker & Hub
                       </h3>
                       <p
@@ -393,12 +414,20 @@
                           margin: 0.2rem 0 0 0;
                         "
                       >
-                        Analyze, track & export ASINs classified by automation software (Orbit-N, Orbit-B, Orbit-A, Aura, Shipment)
+                        Analyze, track & export ASINs classified by automation
+                        software (Orbit-N, Orbit-B, Orbit-A, Aura, Shipment)
                       </p>
                     </div>
                   </div>
 
-                  <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                  <div
+                    style="
+                      display: flex;
+                      gap: 0.6rem;
+                      align-items: center;
+                      flex-wrap: wrap;
+                    "
+                  >
                     <button
                       class="btn btn-secondary btn-sm"
                       id="btnCopySoftwareAsins"
@@ -411,7 +440,7 @@
                       class="btn btn-primary btn-sm"
                       id="btnExportSoftwareExcel"
                       title="Download software report in Excel format"
-                      style="background: #10b981; border-color: #10b981;"
+                      style="background: #10b981; border-color: #10b981"
                     >
                       <i class="fa-solid fa-file-excel"></i>
                       <span>Excel Report</span>
@@ -420,7 +449,7 @@
                       class="btn btn-primary btn-sm"
                       id="btnExportSoftwarePDF"
                       title="Download software report in PDF format"
-                      style="background: #ef4444; border-color: #ef4444;"
+                      style="background: #ef4444; border-color: #ef4444"
                     >
                       <i class="fa-solid fa-file-pdf"></i>
                       <span>PDF Report</span>
@@ -444,7 +473,10 @@
                 <div class="chart-card">
                   <div class="chart-header">
                     <div class="chart-title">
-                      <i class="fa-solid fa-chart-pie" style="color: #6366f1"></i>
+                      <i
+                        class="fa-solid fa-chart-pie"
+                        style="color: #6366f1"
+                      ></i>
                       <span>Software ASIN Volume Distribution</span>
                     </div>
                   </div>
@@ -456,7 +488,10 @@
                 <div class="chart-card">
                   <div class="chart-header">
                     <div class="chart-title">
-                      <i class="fa-solid fa-chart-column" style="color: #10b981"></i>
+                      <i
+                        class="fa-solid fa-chart-column"
+                        style="color: #10b981"
+                      ></i>
                       <span>Ungating Success Rate by Software</span>
                     </div>
                   </div>
@@ -604,16 +639,20 @@
           <section class="view-section" id="view-table">
             <div class="table-card">
               <div class="table-toolbar">
-                <div class="table-search-box">
-                  <i class="fa-solid fa-magnifying-glass"></i>
-                  <input
-                    type="text"
-                    id="tableSearchInput"
-                    placeholder="Filter rows in this table..."
-                  />
+                <!-- Search & Filters -->
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; flex: 1; min-width: 280px;">
+                  <div class="table-search-box" style="min-width: 180px; flex: 1; max-width: 260px;">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input
+                      type="text"
+                      id="tableSearchInput"
+                      placeholder="Search ASIN, Brand, Supplier..."
+                    />
+                  </div>
                 </div>
 
-                <div class="table-toolbar-actions">
+                <!-- Right Side Actions: Page Size & Export Report -->
+                <div class="table-toolbar-actions" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                   <div
                     style="
                       display: flex;
@@ -627,7 +666,7 @@
                     <select
                       class="filter-select"
                       id="tablePageSizeSelect"
-                      style="width: 80px; height: 34px"
+                      style="width: 80px; height: 36px"
                     >
                       <option value="10">10</option>
                       <option value="25" selected>25</option>
@@ -637,7 +676,54 @@
                     </select>
                     <span>rows</span>
                   </div>
+
+                  <!-- Export Report Button & Dropdown -->
+                  <div class="dropdown" style="position: relative; display: inline-flex;">
+                    <button
+                      class="btn btn-sm btn-success"
+                      id="btnExportTableReport"
+                      style="height: 36px; display: inline-flex; align-items: center; gap: 0.45rem; font-weight: 600; border-top-right-radius: 0; border-bottom-right-radius: 0;"
+                      title="Export current table view / selected company & category to Excel"
+                    >
+                      <i class="fa-solid fa-file-excel"></i> Export Report
+                    </button>
+                    <button
+                      class="btn btn-sm btn-success"
+                      id="btnExportTableDropdownToggle"
+                      style="height: 36px; padding: 0 0.5rem; border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 1px solid rgba(255, 255, 255, 0.25);"
+                      title="More export options (PDF, CSV, JSON)"
+                    >
+                      <i class="fa-solid fa-caret-down"></i>
+                    </button>
+                    <div class="dropdown-menu" id="tableExportDropdownMenu">
+                      <button class="dropdown-item" id="btnExportTableExcel">
+                        <i class="fa-solid fa-file-excel text-success"></i> Excel (.xlsx)
+                      </button>
+                      <button class="dropdown-item" id="btnExportTablePDF">
+                        <i class="fa-solid fa-file-pdf text-danger"></i> PDF Document (.pdf)
+                      </button>
+                      <button class="dropdown-item" id="btnExportTableCSV">
+                        <i class="fa-solid fa-file-csv text-primary"></i> CSV Spreadsheet (.csv)
+                      </button>
+                      <button class="dropdown-item" id="btnExportTableJSON">
+                        <i class="fa-solid fa-code text-warning"></i> JSON Data (.json)
+                      </button>
+                    </div>
+                  </div>
                 </div>
+              </div>
+
+              <!-- Filter context badge banner -->
+              <div
+                id="tableActiveFilterSummary"
+                style="display: none; padding: 0.6rem 1.25rem; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-muted); align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;"
+              >
+                <div id="tableActiveFilterText">
+                  <!-- e.g. Showing records for Company: ClickToTheCart Global Inc. | Category: Beauty & Personal Care -->
+                </div>
+                <button class="btn btn-sm btn-outline" id="btnClearTableActiveFilter" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                  <i class="fa-solid fa-xmark me-1"></i> Clear Filters
+                </button>
               </div>
 
               <div class="table-responsive-container">
@@ -694,32 +780,30 @@
                   flex-wrap: wrap;
                 "
               >
-                <button
-                  class="btn btn-secondary btn-sm"
-                  id="btnClearViewPaste"
-                >
+                <button class="btn btn-secondary btn-sm" id="btnClearViewPaste">
                   <i class="fa-solid fa-eraser me-1"></i> Clear Box
                 </button>
-                <button
-                  class="btn btn-outline btn-sm"
-                  id="btnUploadFile"
-                >
-                  <i class="fa-solid fa-file-arrow-up me-1"></i> Upload File (.xlsx, .csv)
+                <button class="btn btn-outline btn-sm" id="btnUploadFile">
+                  <i class="fa-solid fa-file-arrow-up me-1"></i> Upload File
+                  (.xlsx, .csv)
                 </button>
                 <button
                   class="btn btn-outline btn-sm"
                   id="btnLoadSampleDedicated"
                 >
-                  <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Load Sample Data
+                  <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Load
+                  Sample Data
                 </button>
-                <button
-                  class="btn btn-primary btn-sm"
-                  id="btnProcessViewPaste"
-                >
+                <button class="btn btn-primary btn-sm" id="btnProcessViewPaste">
                   <i class="fa-solid fa-bolt me-1"></i> Process Pasted Data
                 </button>
               </div>
-              <input type="file" id="fileUploadInput" accept=".xlsx,.xls,.csv" style="display: none;" />
+              <input
+                type="file"
+                id="fileUploadInput"
+                accept=".xlsx,.xls,.csv"
+                style="display: none"
+              />
             </div>
           </section>
         </div>

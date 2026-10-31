@@ -403,10 +403,10 @@ var ChartManager = (function () {
     let validDateCount = 0;
 
     rows.forEach(r => {
-      const rawDate = r[dateCol];
+      const rawDate = r._normalizedDate || (r[dateCol] ? (typeof DataParser !== 'undefined' ? DataParser.normalizeDateStr(r[dateCol]) : r[dateCol]) : '');
       if (!rawDate) return;
       const parsed = new Date(rawDate);
-      if (isNaN(parsed)) return;
+      if (isNaN(parsed.getTime())) return;
 
       validDateCount++;
       // Format as YYYY-MM-DD
@@ -452,7 +452,7 @@ var ChartManager = (function () {
     charts.trendChart = new Chart(canvas, {
       type: 'line',
       data: {
-        labels: sortedDates,
+        labels: isMonthly ? sortedDates : sortedDates.map(d => typeof DataParser !== 'undefined' ? DataParser.formatDateDDMMYYYY(d) : d),
         datasets: [
           {
             label: 'Total Submissions',
