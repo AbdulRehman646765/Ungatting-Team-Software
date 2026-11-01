@@ -64,6 +64,18 @@
             <i class="fa-solid fa-chart-pie"></i>
             <span>Dashboard</span>
           </a>
+          <a href="#asin-inspector" class="nav-item" data-view="asin-inspector">
+            <i class="fa-solid fa-magnifying-glass-chart"></i>
+            <span>ASIN 360° Checker</span>
+          </a>
+          <a href="#suppliers" class="nav-item" data-view="suppliers">
+            <i class="fa-solid fa-truck-fast"></i>
+            <span>Supplier Scorecard</span>
+          </a>
+          <a href="#shift-analytics" class="nav-item" data-view="shift-analytics">
+            <i class="fa-solid fa-moon"></i>
+            <span>Shift Analytics</span>
+          </a>
           <a href="#software" class="nav-item" data-view="software">
             <i class="fa-solid fa-laptop-code"></i>
             <span>Other ASINs</span>
@@ -298,6 +310,45 @@
               <!-- Dynamically populated by dashboard.js -->
             </div>
 
+            <!-- Intelligence Hub Shortcuts -->
+            <div class="intel-hub-grid" id="intelHubContainer" style="display: none; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+              <!-- Card 1: ASIN 360 Checker -->
+              <div class="intel-quick-card" onclick="window.UngateApp && window.UngateApp.switchView('asin-inspector')">
+                <div class="intel-quick-icon" style="background: rgba(79, 70, 229, 0.12); color: #4f46e5;">
+                  <i class="fa-solid fa-magnifying-glass-chart"></i>
+                </div>
+                <div class="intel-quick-content">
+                  <div class="intel-quick-title">ASIN 360° & Conflict Checker</div>
+                  <div class="intel-quick-desc">Search any ASIN across all accounts to detect cross-company conflicts & historical records.</div>
+                </div>
+                <i class="fa-solid fa-chevron-right intel-quick-arrow"></i>
+              </div>
+
+              <!-- Card 2: Supplier Scorecard -->
+              <div class="intel-quick-card" onclick="window.UngateApp && window.UngateApp.switchView('suppliers')">
+                <div class="intel-quick-icon" style="background: rgba(16, 185, 129, 0.12); color: #10b981;">
+                  <i class="fa-solid fa-truck-fast"></i>
+                </div>
+                <div class="intel-quick-content">
+                  <div class="intel-quick-title">Supplier Intelligence Scorecard</div>
+                  <div class="intel-quick-desc">Top 5 high-approval vendors, high-risk alerts & category-wise recommendations.</div>
+                </div>
+                <i class="fa-solid fa-chevron-right intel-quick-arrow"></i>
+              </div>
+
+              <!-- Card 3: Shift Analytics -->
+              <div class="intel-quick-card" onclick="window.UngateApp && window.UngateApp.switchView('shift-analytics')">
+                <div class="intel-quick-icon" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b;">
+                  <i class="fa-solid fa-moon"></i>
+                </div>
+                <div class="intel-quick-content">
+                  <div class="intel-quick-title">Shift Productivity & Turnaround</div>
+                  <div class="intel-quick-desc">Night shift (5 PM – 1 AM) throughput, daily output, and response turnaround speed.</div>
+                </div>
+                <i class="fa-solid fa-chevron-right intel-quick-arrow"></i>
+              </div>
+            </div>
+
             <!-- Charts Visualization Section -->
             <div id="chartsVisualizationWrapper" style="display: none">
               <div class="section-heading" style="margin-bottom: 1rem">
@@ -385,6 +436,186 @@
                     <canvas id="chartTrend"></canvas>
                   </div>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================================================================
+             NEW VIEW: ASIN 360° HISTORY & CONFLICT CHECKER
+             ================================================================ -->
+          <section class="view-section" id="view-asin-inspector">
+            <div class="report-matrix-card">
+              <div class="report-controls-bar" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.06), rgba(16, 185, 129, 0.04));">
+                <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
+                  <i class="fa-solid fa-magnifying-glass-chart text-primary"></i>
+                  <span>Single ASIN 360° History & Multi-Account Conflict Checker</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <button class="btn btn-sm btn-outline" id="btnAsinInspectorSample">
+                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Try Sample ASIN
+                  </button>
+                </div>
+              </div>
+
+              <!-- Search Bar & Quick Suggestion Chips -->
+              <div style="padding: 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary);">
+                <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                  <div class="table-search-box" style="flex: 1; min-width: 280px; max-width: 500px;">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input
+                      type="text"
+                      id="asinInspectorSearchInput"
+                      placeholder="Enter or paste Amazon ASIN (e.g. B08N5WRWNW)..."
+                      style="font-family: monospace; font-size: 0.95rem; font-weight: 600;"
+                    />
+                  </div>
+                  <button class="btn btn-sm btn-primary" id="btnRunAsinInspection" style="height: 38px; padding: 0 1.25rem;">
+                    <i class="fa-solid fa-radar me-1"></i> Inspect ASIN
+                  </button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.82rem; color: var(--text-muted);">
+                  <span><i class="fa-solid fa-lightbulb text-warning me-1"></i> Quick ASINs from dataset:</span>
+                  <div id="asinInspectorChipsContainer" style="display: flex; gap: 0.4rem; flex-wrap: wrap;"></div>
+                </div>
+              </div>
+
+              <!-- Inspection Results Container -->
+              <div id="asinInspectorResultArea" style="padding: 1.25rem;">
+                <div style="text-align: center; padding: 3.5rem 1rem; color: var(--text-muted);">
+                  <i class="fa-solid fa-magnifying-glass" style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.4; display: block;"></i>
+                  <div style="font-size: 1rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.35rem;">Enter an ASIN to inspect its 360° history</div>
+                  <p style="font-size: 0.85rem; max-width: 500px; margin: 0 auto;">View every submission, check for cross-company conflicts, compare invoices, and verify ungating outcomes.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================================================================
+             NEW VIEW: SUPPLIER INTELLIGENCE & SUCCESS SCORECARD
+             ================================================================ -->
+          <section class="view-section" id="view-suppliers">
+            <div class="report-matrix-card">
+              <div class="report-controls-bar" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(79, 70, 229, 0.04));">
+                <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
+                  <i class="fa-solid fa-truck-fast text-success"></i>
+                  <span>Supplier Intelligence & Success Scorecard</span>
+                </div>
+                <div>
+                  <button class="btn btn-sm btn-success" id="btnExportSupplierScorecard">
+                    <i class="fa-solid fa-file-excel me-1"></i> Export Supplier Scorecard
+                  </button>
+                </div>
+              </div>
+
+              <!-- Top KPI Highlights -->
+              <div id="supplierScorecardKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1.25rem; border-bottom: 1px solid var(--border-color);"></div>
+
+              <!-- Category-Wise Supplier Recommendation Engine -->
+              <div style="padding: 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--bg-tertiary);">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
+                  <div style="font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+                    <i class="fa-solid fa-trophy text-warning"></i>
+                    <span>Category-Wise Best Supplier Recommendation Engine</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Select Category:</label>
+                    <select class="filter-select" id="supplierScorecardCatSelect" style="min-width: 220px; height: 36px;">
+                      <option value="">-- Choose Category --</option>
+                    </select>
+                  </div>
+                </div>
+                <div id="supplierRecommendationCard"></div>
+              </div>
+
+              <!-- Top 5 Best & High-Risk Grid -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; padding: 1.25rem; border-bottom: 1px solid var(--border-color);">
+                <div class="card" style="padding: 1.25rem; border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); background: var(--bg-secondary);">
+                  <div style="font-weight: 700; color: var(--status-approved-text); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Top 5 Best Suppliers (Highest Approval Rate)</span>
+                  </div>
+                  <div id="topSuppliersList"></div>
+                </div>
+
+                <div class="card" style="padding: 1.25rem; border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-md); background: var(--bg-secondary);">
+                  <div style="font-weight: 700; color: var(--status-rejected-text); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>High-Risk Suppliers (Frequent Rejections Alert)</span>
+                  </div>
+                  <div id="highRiskSuppliersList"></div>
+                </div>
+              </div>
+
+              <!-- Full Supplier Intelligence Table -->
+              <div style="padding: 1.25rem 1.25rem 0.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+                <div style="font-weight: 700; color: var(--text-main);">
+                  <i class="fa-solid fa-list-check me-1"></i> All Suppliers Intelligence & Ranking
+                </div>
+                <div class="table-search-box" style="min-width: 220px; max-width: 320px;">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="supplierTableSearchInput" placeholder="Filter suppliers..." />
+                </div>
+              </div>
+
+              <div class="table-responsive-container">
+                <table class="custom-data-table" id="supplierScorecardTable">
+                  <thead id="supplierScorecardHead"></thead>
+                  <tbody id="supplierScorecardBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================================================================
+             NEW VIEW: SHIFT PRODUCTIVITY & TURNAROUND TIME ANALYTICS
+             ================================================================ -->
+          <section class="view-section" id="view-shift-analytics">
+            <div class="report-matrix-card">
+              <div class="report-controls-bar" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(245, 158, 11, 0.04));">
+                <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
+                  <i class="fa-solid fa-moon text-primary"></i>
+                  <span>Shift Productivity & Turnaround Time (5:00 PM – 1:00 AM Analytics)</span>
+                </div>
+                <div>
+                  <button class="btn btn-sm btn-primary" id="btnExportShiftReport">
+                    <i class="fa-solid fa-file-excel me-1"></i> Export Shift Analytics
+                  </button>
+                </div>
+              </div>
+
+              <!-- Shift Overview KPIs -->
+              <div id="shiftOverviewKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; padding: 1.25rem; border-bottom: 1px solid var(--border-color);"></div>
+
+              <!-- Turnaround Speed Distribution -->
+              <div style="padding: 1.25rem; border-bottom: 1px solid var(--border-color); background: var(--bg-tertiary);">
+                <div style="font-weight: 700; color: var(--text-main); margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+                  <i class="fa-solid fa-stopwatch text-primary"></i>
+                  <span>Case Re-Open Turnaround Speed Distribution (Status Time → Case Activity Time)</span>
+                </div>
+                <div id="turnaroundDistributionCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;"></div>
+              </div>
+
+              <!-- Shift Date Performance Tracker Table -->
+              <div style="padding: 1.25rem 1.25rem 0.5rem; font-weight: 700; color: var(--text-main);">
+                <i class="fa-solid fa-calendar-day me-1"></i> Daily Shift Output & Resolution Matrix
+              </div>
+              <div class="table-responsive-container">
+                <table class="custom-data-table" id="shiftDailyTable">
+                  <thead id="shiftDailyHead"></thead>
+                  <tbody id="shiftDailyBody"></tbody>
+                </table>
+              </div>
+
+              <!-- Recent Turnaround Activities Table -->
+              <div style="padding: 1.5rem 1.25rem 0.5rem; font-weight: 700; color: var(--text-main); border-top: 2px solid var(--border-color);">
+                <i class="fa-solid fa-clock-rotate-left me-1"></i> Recent Case Re-Open Turnarounds Log
+              </div>
+              <div class="table-responsive-container">
+                <table class="custom-data-table" id="shiftTurnaroundLogTable">
+                  <thead id="shiftTurnaroundLogHead"></thead>
+                  <tbody id="shiftTurnaroundLogBody"></tbody>
+                </table>
               </div>
             </div>
           </section>
@@ -641,12 +872,12 @@
               <div class="table-toolbar">
                 <!-- Search & Filters -->
                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; flex: 1; min-width: 280px;">
-                  <div class="table-search-box" style="min-width: 180px; flex: 1; max-width: 260px;">
+                  <div class="table-search-box" style="min-width: 160px; flex: 1; max-width: 220px;">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <input
                       type="text"
                       id="tableSearchInput"
-                      placeholder="Search ASIN, Brand, Supplier..."
+                      placeholder="Search ASIN, Brand..."
                     />
                   </div>
                 </div>
